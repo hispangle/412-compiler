@@ -8,7 +8,7 @@
 
 
 //global current char
-char cur_char = 'Z';
+char cur_char;
 
 
 //char class identifiers
@@ -28,8 +28,10 @@ enum classes{
 
 
 //dfa table
+//outputs a state
 //nstates x nclass
-const int delta_char[][NUMBER + 28] = {{40}};
+//ASSUMES NUMBER is last explicit type, a-z and I get individual classes
+const int delta_char[][NUMBER + 28] = {{1}, {EoF}};
 
 
 //lookup array for chars
@@ -49,19 +51,18 @@ struct token get_next_token(){
     do{
         class = CHAR_CLASS[cur_char];
         state = delta_char[state][class];
+        printf("class: %i, cur_char: %c, state: %i\n", class, cur_char, state);
         cur_char = get_next_char();
-    } while (state < 39);
+    } while (state < 2);
 
-    printf("%i\n", CHAR_CLASS['0']);
-
-    struct token tok = {0, 0};
+    struct token tok = {state, eof};
     return tok;
 }
 
 
 //does any initialization
-//CAN BE MOVED TO MAINS
-void setup(){
+//CAN BE MOVED IF NECESSARY
+void setup(char* filename){
     //numbers map to number
     for(uint8_t num = '0'; num < '9'; num ++){
         CHAR_CLASS[num] = NUMBER;
@@ -87,23 +88,89 @@ void setup(){
     CHAR_CLASS['>'] = GT;
 }
 
-int main(int argc, char* argv[]){
+//function that displays help for commandline args
+void help(){
+    printf("help!\n");
+}
 
-    for(int i = 1; i < argc; i++){
+//function that displays the internal representation of the program
+void rep(char* filename){
+    printf("rep!\n");
+    setup(filename);
+}
+
+//function that scans the program and displays tokens
+void scan(char* filename){
+    printf("scan!\n");
+    setup(filename);   
+}
+
+//function that parses the program, builds the IR, and reports success or failure. The default
+void parse(char* filename){
+    printf("parse!\n");
+    setup(filename);
+
+    printf("setup finished!\n");
+    struct token tok = get_next_token();
+    while(tok.type != EoF){
+        printf("type: %i or %s, name: %i or %s", tok.type, TOKEN_TYPES[tok.type], tok.name, TOKEN_NAMES[tok.name]);
+        tok = get_next_token();
+    }
+}
+
+int main(int argc, char* argv[]){
+    //flags
+    uint8_t h = 0;
+    uint8_t s = 0;
+    uint8_t r = 0;
+    uint8_t p = 0;
+
+    //check arguments
+    for(int i = 1; i < argc; i += 2){
         char* word = argv[i];
-        if(strcmp(word, "-h")){
-            printf("help, %s", word);
+        if(!strcmp(word, "-h")){
+            h = i;
+            break;
+        }
+        else if(!strcmp(word, "-s")){
+            s = i;
+        }
+        else if(!strcmp(word, "-p")){
+            p = i;
+        }
+        else if(!strcmp(word, "-r")){
+            r = i;
+        }
+        else if(i == 1 && argc == 2){
+            break;
+        }
+        else{
+            printf("Bad arguments!\n");
+            h = 1;
+            break;
         }
     }
 
+    //process flags
+    if(h){
+        help();
+    }
+    else if(r && r < (argc - 1)){
+        rep(argv[r + 1]);
+    }
+    else if(p && p < (argc - 1)){
+        parse(argv[p + 1]);
+    }
+    else if(s && s < (argc - 1)){
+        scan(argv[s + 1]);
+    }
+    else if(argc == 2){
+        parse(argv[1]);
+    }
+    else{
+        printf("Bad Arguments!\n");
+        help();
+    }
 
-
-    setup();
-
-
-
-
-
-    get_next_token();
     return 0;
 }
