@@ -18,14 +18,15 @@ const char* TOKEN_TYPES[] = {
     "MEMOP",
     "LOADI",
     "COMMA",
+    "EOF",
     "ARITHOP",
     "OUTPUT",
     "NOP",
     "CONSTANT",
     "REGISTER",
     "INTO",
-    "EOF",
-    "EOL"
+    "EOL",
+    "ERROR"
 };
 
 //enumerates index of each type
@@ -34,14 +35,15 @@ enum token_types{
     MEMOP = 0,
     LOADI,
     COMMA,
+    EoF, //compiler did not like EOF
     ARITHOP,
     OUTPUT,
     NOP,
     CONSTANT,
     REGISTER,
     INTO,
-    EoF, //compiler did not like EOF
-    EOL
+    EOL,
+    ERROR
 };
 
 
@@ -52,14 +54,15 @@ const char* TOKEN_NAMES[][5] = {
     {"load", "store"},
     {"loadI"},
     {","},
+    {""},
     {"add", "sub", "mult", "lshift", "rshift"},
     {"output"},
     {"nop"},
     {},
     {},
     {"=>"},
-    {""},
-    {"\\n"}
+    {"\\n"},
+    {"Invalid spelling"}
 };
 
 //enumerates the index of each word
@@ -69,6 +72,8 @@ enum token_names{
     load = 0,
     store,
     loadI = 0,
+    comma = 0,
+    eof = 0,
     add = 0,
     sub,
     mult,
@@ -76,8 +81,7 @@ enum token_names{
     rshift,
     output = 0,
     nop = 0,
-    comma = 0,
     into = 0,
-    eof = 0,
-    nl = 0
+    eol = 0,
+    spelling = 0
 };
