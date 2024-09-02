@@ -3,12 +3,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-#include "constants.c"
+#include "constants.h"
 
 
 
 //global current char
-char cur_char;
+static char cur_char;
+static FILE* file;
 
 
 //char class identifiers
@@ -39,22 +40,55 @@ const int delta_char[][NUMBER + 28] = {{1}, {EoF}};
 //ASSUMES ASCII
 uint8_t CHAR_CLASS[255];
 
+//number conversion
+uint8_t ctoi[255];
 
+//simple function
+//CAN BE OPTIMIZED INTO DOUBLE BUFFER
 char get_next_char(){
-    return 'C';
+    return fgetc(file);
 }
 
 struct token get_next_token(){
     uint8_t class = 0;
     uint8_t state = 0;
     uint32_t num = 0;
+
+    //follows table rep of dfa
+    //needs to build numbers
     do{
         class = CHAR_CLASS[cur_char];
-        state = delta_char[state][class];
-        printf("class: %i, cur_char: %c, state: %i\n", class, cur_char, state);
-        cur_char = get_next_char();
-    } while (state < 2);
 
+        //builds number
+        //if slow, pulled out for 1 if every token instead of an if every character
+        //or build number every character if thats good enough
+        //make sure size check is correct
+        if(class == NUMBER){
+            num = num * 10;
+            num += ctoi[cur_char];
+        }
+
+        state = delta_char[state][class];
+        printf("class: %i, cur_char: %c, state: %i, num: %i\n", class, cur_char, state, num);
+        cur_char = get_next_char();
+    } while (state < 2); //not ',', '=>', whitespace, '//', EOL, EOF
+
+
+    //follow until whitespace is done
+    while(CHAR_CLASS[cur_char] == WHITESPACE){
+        cur_char = get_next_char();
+    }
+
+    //follow until comment is done
+    //change number to correct one with proper table
+    //can be different with a double buffer or line reader
+    if(state == 69){
+        while(cur_char != '\n'){
+            cur_char = get_next_char();
+        }
+    }
+
+    //TODO: rework tok making
     struct token tok = {state, eof};
     return tok;
 }
@@ -62,10 +96,13 @@ struct token get_next_token(){
 
 //does any initialization
 //CAN BE MOVED IF NECESSARY
-void setup(char* filename){
+int setup(char* filename){
     //numbers map to number
-    for(uint8_t num = '0'; num < '9'; num ++){
+    for(uint8_t num = '0'; num <= '9'; num ++){
         CHAR_CLASS[num] = NUMBER;
+        char temp[] = {num, '\0'};
+        ctoi[num] = atoi(temp);
+        printf("num: %c, val: %i\n", num, ctoi[num]);
     }
 
     //capital I for loadI operation
@@ -73,7 +110,7 @@ void setup(char* filename){
 
     //letters map to their own class
     //CAN BE MADE BETTER
-    for(uint8_t letter = 'a'; letter < 'z'; letter ++){
+    for(uint8_t letter = 'a'; letter <= 'z'; letter ++){
         CHAR_CLASS[letter] = NUMBER + 2 + letter - 'a'; //+2 instead of +1 because of I
     }
 
@@ -86,6 +123,16 @@ void setup(char* filename){
     CHAR_CLASS[' '] = WHITESPACE;
     CHAR_CLASS['='] = EQUALS;
     CHAR_CLASS['>'] = GT;
+
+    //open file
+    file = fopen(filename, "r");
+    if(file == NULL){
+        printf("file %s unable to be opened.\n");
+        return -1;
+    }
+
+    cur_char = get_next_char(); //here bc my function is a do while
+    return 0;
 }
 
 //function that displays help for commandline args
@@ -94,21 +141,35 @@ void help(){
 }
 
 //function that displays the internal representation of the program
-void rep(char* filename){
+int rep(char* filename){
     printf("rep!\n");
-    setup(filename);
+
+    int code;
+    if(code = setup(filename)){
+        return code;
+    }
+
+    return 0;
 }
 
 //function that scans the program and displays tokens
-void scan(char* filename){
+int scan(char* filename){
     printf("scan!\n");
-    setup(filename);   
+    int code;
+    if(code = setup(filename)){
+        return code;
+    }
+
+    return 0;
 }
 
 //function that parses the program, builds the IR, and reports success or failure. The default
-void parse(char* filename){
+int parse(char* filename){
     printf("parse!\n");
-    setup(filename);
+    int code;
+    if(code = setup(filename)){
+        return code;
+    }
 
     printf("setup finished!\n");
     struct token tok = get_next_token();
@@ -116,6 +177,8 @@ void parse(char* filename){
         printf("type: %i or %s, name: %i or %s", tok.type, TOKEN_TYPES[tok.type], tok.name, TOKEN_NAMES[tok.name]);
         tok = get_next_token();
     }
+
+    return 0;
 }
 
 int main(int argc, char* argv[]){
@@ -152,25 +215,26 @@ int main(int argc, char* argv[]){
     }
 
     //process flags
+    int code = 0;
     if(h){
         help();
     }
     else if(r && r < (argc - 1)){
-        rep(argv[r + 1]);
+        code = rep(argv[r + 1]);
     }
     else if(p && p < (argc - 1)){
-        parse(argv[p + 1]);
+        code = parse(argv[p + 1]);
     }
     else if(s && s < (argc - 1)){
-        scan(argv[s + 1]);
+        code = scan(argv[s + 1]);
     }
     else if(argc == 2){
-        parse(argv[1]);
+        code = parse(argv[1]);
     }
     else{
         printf("Bad Arguments!\n");
         help();
     }
 
-    return 0;
+    return code;
 }
