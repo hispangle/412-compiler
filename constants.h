@@ -62,7 +62,7 @@ const char* TOKEN_NAMES[][5] = {
     {},
     {"=>"},
     {"\\n"},
-    {"Invalid spelling"}
+    {"Invalid spelling", "Overflow/Above Constant Limit"}
 };
 
 //enumerates the index of each word
@@ -83,5 +83,6 @@ enum token_names{
     nop = 0,
     into = 0,
     eol = 0,
-    spelling = 0
+    spelling = 0,
+    overflow
 };

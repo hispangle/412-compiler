@@ -21,8 +21,9 @@ static const uint32_t MAX_CONST = (ONE << 31) - 1;
 
 //char class identifiers
 //just for readability
-//COMMA matches position in TOKEN_TYPES
+//COMMA and EoF match positions in TOKEN_TYPES
 enum classes{
+    OVERFLOW = 47,
     INVALID = 0,
     FSLASH,
     //COMMA = 2, //COMMA excluded, included already in token_types
@@ -39,14 +40,15 @@ enum classes{
 //dfa table
 //outputs a state
 //nstates x nclass
-//ASSUMES NUMBER is last explicit type, a-z and I get individual classes\
-//                                INV, '/', ',', '\n', '\r', WS, '=', '>', #, I, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
-int delta_char[50][NUMBER + 28];
+//ASSUMES NUMBER is last explicit type, a-z and I get individual classes
+//INV, '/', ',', '\n', '\r', WS, '=', '>', #, I, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, OVERFLOW
+int delta_char[53][NUMBER + 28];
 
 
 //lookup array for chars
 //defaults to 0, therefore 0 is an error/everything else class
 //ASSUMES ASCII
+//malloced in setup, maybe initialize as array
 uint8_t* CHAR_CLASS;
 
 //number conversion
@@ -60,7 +62,7 @@ char get_next_char(){
 
 //moves to the next '\n'
 void get_next_line(){
-    while((cur_char = get_next_char()) != '\n'){
+    while((cur_char = get_next_char()) != '\n' && cur_char != -1){
     }
 }
 
@@ -68,6 +70,7 @@ void get_next_line(){
 //gets the next token
 //right now is a dowhile for terminating cases like ,
 //changed to normal while and go backwards 1 spot if unoptimal
+//maybe insert eol before eof
 struct token get_next_token(){
     uint8_t state = 1; //default is 1, 0 is error
     uint32_t num = 0;
@@ -75,13 +78,16 @@ struct token get_next_token(){
     //follows table rep of dfa
     //needs to build numbers
     do{
+        //printf("class: %i, cur_char: %c, state: %i, num: %i\n", class, cur_char, state, num);
         //builds number
         //if slow, pulled out for 1 if every token instead of an if every character
+        //pull out 'r' as well
         //or build number every character if thats good enough
         //make sure size check is correct
+        //make sure error is displayed correctly (size not spelling)
         if(class == NUMBER){
-            if((MAX_CONST - ctoi[cur_char]) / 10 < num){
-                printf("Overflow!\n");
+            if((MAX_CONST - ctoi[cur_char]) / 10 < num){ //can be optimized with an array if needed
+                state = OVERFLOW;
                 break;
             }
             num = num * 10;
@@ -91,8 +97,8 @@ struct token get_next_token(){
         state = delta_char[state][class];
         cur_char = get_next_char();
         class = CHAR_CLASS[cur_char];
-        //printf("class: %i, cur_char: %i, state: %i, num: %i\n", class, cur_char, state, num);
-    } while (state < 47 && class > 6); //not a self terminating state (like , or // or an error) and next char not a terminating character (like , or \t) or an error
+    } while (state < 47 && class > 7); //not a self terminating state (like , or // or an error) 
+    //and next char not a terminating character (like , or \t) or an error
 
 
     //follow until whitespace is done
@@ -100,10 +106,12 @@ struct token get_next_token(){
         cur_char = get_next_char();
     }
 
-    //follow until new line if comment or error
+    //follow until new line or eof if comment, error, or overflow
+    //return here
+    //make sure to get next char and class after
     //change number to correct one with proper table
     //can be different with a double buffer or line reader
-    if(state == 69 || state == 420){
+    if(state == 49 || state == 0 || state == 47){
         get_next_line();
     }
 
@@ -124,31 +132,93 @@ struct token get_next_token(){
             type = MEMOP;
             name = store;
             break;
-        case 8:
+        case 8: //sub
             type = ARITHOP;
             name = sub;
             break;
-        case 25:
+        case 12: //load
+            type = MEMOP;
+            name = load;
+            break;
+        case 13: //loadI
+            type = LOADI;
+            name = loadI;
+            break;
+        case 18: //lshift
+            type = ARITHOP;
+            name = lshift;
+            break;
+        case 24: //rshift
+            type = ARITHOP;
+            name = rshift;
+            break;
+        case 25: //register
             type = REGISTER;
             name = num;
             break;
-        case 26:
+        case 26: //constant
             type = CONSTANT;
             name = num;
             break;
+        case 30: //mult
+            type = ARITHOP;
+            name = mult;
+            break;
+        case 33: //add
+            type = ARITHOP;
+            name = add;
+            break;
+        case 36: //nop
+            type = NOP;
+            name = nop;
+            break;
+        case 42: //output
+            type = OUTPUT;
+            name = output;
+            break;
         case 47:
+            type = ERROR;
+            name = overflow;
+            break;
+        case 48: //eol
             type = EOL;
             name = eol;
             break;
-        case 51: //eof
+        case 50: //into
+            type = INTO;
+            name = into;
+            break;
+        case 51: //comma
+            type = COMMA;
+            name = comma;
+            break;
+        case 52: //eof
             type = EoF;
             name = eof;
             break;
         default: 
-            type = MEMOP;
-            name = load;
+            type = ERROR;
+            name = spelling;
     }
     struct token tok = {type, name};
+    return tok;
+}
+
+//skips all tokens until EOL
+//useful for long lines
+//maybe insert eol befor eof
+//lightly tested
+struct token get_next_eol_token(){
+    get_next_line();  
+    //printf("class: %i, cur_char: %c\n", class, cur_char);
+    
+    if(CHAR_CLASS[cur_char] == NL){ //eol
+        cur_char = get_next_char();
+        class = CHAR_CLASS[cur_char];
+        struct token tok = {EOL, eol};
+        return tok;
+    }
+    struct token tok = {EoF, eof};
     return tok;
 }
 
@@ -157,6 +227,7 @@ struct token get_next_token(){
 //CAN BE MOVED IF NECESSARY
 int setup(char* filename){
     //initialize CHAR_CLASS
+    //maybe do array pointer stuff instead of malloc if slow?
     {
         //give space to array
         CHAR_CLASS = malloc(sizeof(uint8_t) * 257);
@@ -180,7 +251,9 @@ int setup(char* filename){
         //letters map to their own class
         //CAN BE MADE BETTER
         for(uint8_t letter = 'a'; letter <= 'z'; letter ++){
-            CHAR_CLASS[letter] = NUMBER + 2 + letter - 'a'; //+2 instead of +1 because of I (really (NUMBER + 1) + 1 + (letter - 'a'))
+            CHAR_CLASS[letter] = NUMBER + 2 + letter - 'a'; 
+            //+2 instead of +1 because of I 
+            //(really (NUMBER + 1) + 1 + (letter - 'a'))
         }
 
         //special mappings
@@ -197,7 +270,7 @@ int setup(char* filename){
     //open file
     file = fopen(filename, "r");
     if(file == NULL){
-        printf("file %s unable to be opened.\n");
+        printf("file %s unable to be opened.\n", filename);
         return -1;
     }
 
@@ -225,19 +298,19 @@ int setup(char* filename){
         delta_char[1][FSLASH] = 44; ///
         delta_char[1][EQUALS] = 45; //=
         delta_char[1][CF] = 46; //\r
-        delta_char[1][NL] = 47; //\n
-        delta_char[1][COMMA] = 50; //,
-        delta_char[1][EoF] = 51; //EoF
+        delta_char[1][NL] = 48; //\n
+        delta_char[1][COMMA] = 51; //,
+        delta_char[1][EoF] = 52; //EoF
 
         //s     2
-        delta_char[2][NUMBER + 2 + 't' - 'a'] = 3;
-        delta_char[3][NUMBER + 2 + 'u' - 'a'] = 6;
+        delta_char[2][NUMBER + 2 + 't' - 'a'] = 3; //st
+        delta_char[3][NUMBER + 2 + 'u' - 'a'] = 6; //su
         
         //st    3
-        delta_char[3][NUMBER + 2 + 'o' - 'a'] = 4;
+        delta_char[3][NUMBER + 2 + 'o' - 'a'] = 4; //sto
 
         //sto   4
-        delta_char[4][NUMBER + 2 + 'r' - 'a'] = 5;
+        delta_char[4][NUMBER + 2 + 'r' - 'a'] = 5; //stor
 
         //stor  5
         delta_char[5][NUMBER + 2 + 'e' - 'a'] = 6; //store
@@ -359,140 +432,32 @@ int setup(char* filename){
         //white space
 
         ///     44
-        delta_char[44][FSLASH] = 48;
+        delta_char[44][FSLASH] = 49; ////
 
         //=     45
-        delta_char[45][EQUALS] = 49;
+        delta_char[45][GT] = 50; //=>
 
         //\r    46
-        delta_char[46][NL] = 47;
+        delta_char[46][NL] = 48; //\r\n
 
-        //\n    47
+        //OVERFLOW  47
+        delta_char[47][NUMBER] = 47; //OVERFLOW
+
+        //\n    48
         //terminator
 
-        ////    48
+        ////    49
         //terminator
 
-        // =>   49
+        // =>   50
         //terminator
 
-        //,     50
+        //,     51
         //terminator
 
-        //eof   51
+        //eof   52
         //terminator
     }
 
     return 0;
-}
-
-//function that displays help for commandline args
-void help(){
-    printf("help!\n");
-}
-
-//function that displays the internal representation of the program
-int rep(char* filename){
-    printf("rep!\n");
-
-    int code;
-    if(code = setup(filename)){
-        return code;
-    }
-
-    return 0;
-}
-
-//function that scans the program and displays tokens
-int scan(char* filename){
-    printf("scan!\n");
-    int code;
-    if(code = setup(filename)){
-        return code;
-    }
-
-    return 0;
-}
-
-//function that parses the program, builds the IR, and reports success or failure. The default
-int parse(char* filename){
-    printf("parse!\n");
-    int code;
-    if(code = setup(filename)){
-        return code;
-    }
-
-    printf("setup finished!\n");
-    struct token tok = get_next_token();
-    while(tok.type != EoF){
-        //tok type needs to be checked for number name (CONST or REG)
-        if(tok.type != CONSTANT && tok.type != REGISTER){
-            printf("type: %i or %s, name: %i or %s\n\n", tok.type, TOKEN_TYPES[tok.type], tok.name, TOKEN_NAMES[tok.type][tok.name]);
-        } else{
-            printf("type: %i or %s, name: %i\n\n", tok.type, TOKEN_TYPES[tok.type], tok.name);
-        }
-        
-        tok = get_next_token();
-    }
-
-    return 0;
-}
-
-
-int main(int argc, char* argv[]){
-    //flags
-    uint8_t h = 0;
-    uint8_t s = 0;
-    uint8_t r = 0;
-    uint8_t p = 0;
-
-    //check arguments
-    for(int i = 1; i < argc; i += 2){
-        char* word = argv[i];
-        if(!strcmp(word, "-h")){
-            h = i;
-            break;
-        }
-        else if(!strcmp(word, "-s")){
-            s = i;
-        }
-        else if(!strcmp(word, "-p")){
-            p = i;
-        }
-        else if(!strcmp(word, "-r")){
-            r = i;
-        }
-        else if(i == 1 && argc == 2){
-            break;
-        }
-        else{
-            printf("Bad arguments!\n");
-            h = 1;
-            break;
-        }
-    }
-
-    //process flags
-    int code = 0;
-    if(h){
-        help();
-    }
-    else if(r && r < (argc - 1)){
-        code = rep(argv[r + 1]);
-    }
-    else if(p && p < (argc - 1)){
-        code = parse(argv[p + 1]);
-    }
-    else if(s && s < (argc - 1)){
-        code = scan(argv[s + 1]);
-    }
-    else if(argc == 2){
-        code = parse(argv[1]);
-    }
-    else{
-        printf("Bad Arguments!\n");
-        help();
-    }
-
-    return code;
 }
