@@ -1,6 +1,7 @@
 //constants or structs to be used in multiple files
-//change to header file
+//can also be thought of as translations from int to string (factorizing)
 
+//need to make sure no possibility of out of bounds / segfault
 
 //how tokens are structured
 struct token {
@@ -8,7 +9,26 @@ struct token {
     uint32_t name; //anything in token_names (or constant of size below 2^31)
 };
 
+//how arguments are stored
+struct argument {
+    uint32_t SR;
+    uint32_t VR;
+    uint32_t PR;
+    uint32_t NU;
+};
 
+//IR
+struct IR {
+    //required fields
+    uint8_t opcode;
+    struct argument arg1;
+    struct argument arg2;
+    struct argument arg3;
+
+    //linked list
+    struct IR* next;
+    struct IR* prev;
+};
 
 
 
@@ -46,7 +66,7 @@ enum token_types{
     ERROR
 };
 
-
+//remove the second array (just delete purple braces)
 
 //lexeme of tokens
 //matches TOKEN_TYPES order
@@ -62,7 +82,7 @@ const char* TOKEN_NAMES[][5] = {
     {},
     {"=>"},
     {"\\n"},
-    {"Invalid spelling", "Overflow/Above Constant Limit"}
+    {"Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"}
 };
 
 //enumerates the index of each word
@@ -84,5 +104,25 @@ enum token_names{
     into = 0,
     eol = 0,
     spelling = 0,
-    overflow
+    overflow,
+    invalid_op,
+    invalid_sentence
 };
+
+
+
+
+//op codes
+enum OPCODES{
+    LOAD,
+    //LOADI,
+    STORE = 2,
+    ADD,
+    SUB,
+    //OUTPUT,
+    //NOP,
+    MULT = 7,
+    LSHIFT,
+    RSHIFT,
+
+}

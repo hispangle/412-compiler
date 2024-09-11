@@ -1,10 +1,18 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include "constants.h"
 
+//need to make sure no possibility of out of bounds / segfault
+//HANDLE WHITESPACE AT START OF THING (done)
+//put class finding in get_char and get_line?
+
+//have flag if eol already inserted before eof //prevents inf loop
+uint8_t eolInserted = 0;
+
+//global token pointer
+struct token* cur_tok;
 
 //global current class and char
 static uint8_t class;
@@ -41,8 +49,8 @@ enum classes{
 //outputs a state
 //nstates x nclass
 //ASSUMES NUMBER is last explicit type, a-z and I get individual classes
-//INV, '/', ',', '\n', '\r', WS, '=', '>', #, I, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z, OVERFLOW
-int delta_char[53][NUMBER + 28];
+//OTHER, '/', ',', '\n', '\r', WS, '=', '>', #, I, a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z
+uint8_t delta_char[53][NUMBER + 28];
 
 
 //lookup array for chars
@@ -51,26 +59,28 @@ int delta_char[53][NUMBER + 28];
 //malloced in setup, maybe initialize as array
 uint8_t* CHAR_CLASS;
 
-//number conversion
-uint8_t ctoi[256];
 
 //simple function
 //CAN BE OPTIMIZED INTO DOUBLE BUFFER
 char get_next_char(){
-    return fgetc(file);
+    char c = fgetc(file);
+    class = CHAR_CLASS[c];
+    return c;
 }
 
 //moves to the next '\n'
 void get_next_line(){
     while((cur_char = get_next_char()) != '\n' && cur_char != -1){
     }
+    class = CHAR_CLASS[cur_char];
 }
 
 
 //gets the next token
-//right now is a dowhile for terminating cases like ,
+//ignores further characters in a line if there is an error
+//right now is a dowhile
 //changed to normal while and go backwards 1 spot if unoptimal
-//maybe insert eol before eof
+//return nothing and change contents of cur_tok if inefficient
 struct token get_next_token(){
     uint8_t state = 1; //default is 1, 0 is error
     uint32_t num = 0;
@@ -86,23 +96,23 @@ struct token get_next_token(){
         //make sure size check is correct
         //make sure error is displayed correctly (size not spelling)
         if(class == NUMBER){
-            if((MAX_CONST - ctoi[cur_char]) / 10 < num){ //can be optimized with an array if needed
+            if((MAX_CONST - (cur_char - '0')) / 10 < num){ //can be optimized with an array if needed
                 state = OVERFLOW;
                 break;
             }
             num = num * 10;
-            num += ctoi[cur_char];
+            num += (cur_char - '0');
         }
 
         state = delta_char[state][class];
         cur_char = get_next_char();
-        class = CHAR_CLASS[cur_char];
+        //class = CHAR_CLASS[cur_char];
     } while (state < 47 && class > 7); //not a self terminating state (like , or // or an error) 
     //and next char not a terminating character (like , or \t) or an error
 
 
     //follow until whitespace is done
-    while(CHAR_CLASS[cur_char] == WHITESPACE){
+    while(class == WHITESPACE){
         cur_char = get_next_char();
     }
 
@@ -116,9 +126,9 @@ struct token get_next_token(){
     }
 
     //finish getting class
-    class = CHAR_CLASS[cur_char];
+    //can be put in while and if to save time
+    //class = CHAR_CLASS[cur_char];
 
-    //TODO: rework tok making
     //classify based on state
     uint8_t type;
     uint32_t name;
@@ -193,8 +203,16 @@ struct token get_next_token(){
             name = comma;
             break;
         case 52: //eof
-            type = EoF;
-            name = eof;
+            //insert 1 eol before eof
+            if(eolInserted){
+                type = EoF;
+                name = eof;
+            } else{
+                type = EOL;
+                name = eol;
+                eolInserted = 1;
+            }
+            
             break;
         default: 
             type = ERROR;
@@ -210,22 +228,14 @@ struct token get_next_token(){
 //lightly tested
 struct token get_next_eol_token(){
     get_next_line();  
-    //printf("class: %i, cur_char: %c\n", class, cur_char);
-    
-    if(CHAR_CLASS[cur_char] == NL){ //eol
-        cur_char = get_next_char();
-        class = CHAR_CLASS[cur_char];
-        struct token tok = {EOL, eol};
-        return tok;
-    }
-    struct token tok = {EoF, eof};
+    struct token tok = {EOL, eol};
     return tok;
 }
 
 
 //does any initialization
 //CAN BE MOVED IF NECESSARY
-int setup(char* filename){
+int setup_scanner(char* filename){
     //initialize CHAR_CLASS
     //maybe do array pointer stuff instead of malloc if slow?
     {
@@ -241,8 +251,6 @@ int setup(char* filename){
         //numbers map to number
         for(uint8_t num = '0'; num <= '9'; num ++){
             CHAR_CLASS[num] = NUMBER;
-            char temp[] = {num, '\0'};
-            ctoi[num] = atoi(temp);
         }
 
         //capital I for loadI operation
@@ -276,11 +284,20 @@ int setup(char* filename){
 
     //initialize character states
     cur_char = get_next_char(); //here bc my function is a do while
-    class = CHAR_CLASS[cur_char]; //also here bc do while
+    while(class == WHITESPACE){//ignore any initial whitespace
+        cur_char = get_next_char();
+    }
+    //class = CHAR_CLASS[cur_char]; //also here bc do while
 
     //create dfa table
-    //manual for early testing
-    //automatic later
+    //assumes whitespace after op necessary
+    //if no assumption, endings are self terminating states
+    //load and loadI special cases, maybe think about it idk its not necessary
+    //bc d is not necessarily self terminating
+    //I similar to /?
+    //d self terminating in all cases except I
+    //special I class?
+    //not thinking about it more 
     {
         //err   0
         //all error

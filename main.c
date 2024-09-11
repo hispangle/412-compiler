@@ -1,6 +1,7 @@
 #include "scanner.c"
+#include "parser.c"
 
-extern int setup(char* filename);
+extern int setup_scanner(char* filename);
 extern struct token get_next_token();
 
 //prints token
@@ -15,16 +16,24 @@ void print_token(struct token tok){
 
 
 //function that displays help for commandline args
-void help(){
+void h(){
     printf("help!\n");
 }
 
 //function that displays the internal representation of the program
-int rep(char* filename){
+int r(char* filename){
     printf("rep!\n");
+    
+    //create tok_pointer
+    struct token* tok = malloc(sizeof(struct token));
 
     int code;
-    if(code = setup(filename)){
+    if(code = setup_scanner(filename)){
+        return code;
+    }
+
+    //setup parser
+    if(code = setup_parser(tok)){
         return code;
     }
 
@@ -32,25 +41,15 @@ int rep(char* filename){
 }
 
 //function that scans the program and displays tokens
-int scan(char* filename){
+int s(char* filename){
     printf("scan!\n");
     int code;
-    if(code = setup(filename)){
-        return code;
-    }
-
-    return 0;
-}
-
-//function that parses the program, builds the IR, and reports success or failure. The default
-int parse(char* filename){
-    printf("parse!\n");
-    int code;
-    if(code = setup(filename)){
+    if(code = setup_scanner(filename)){
         return code;
     }
 
     printf("setup finished!\n");
+
     struct token tok = get_next_token();
     while(tok.type != EoF){
         //tok type needs to be checked for number name (CONST or REG)
@@ -59,6 +58,35 @@ int parse(char* filename){
     }
 
     print_token(tok);
+
+    return 0;
+}
+
+//function that parses the program, builds the IR, and reports success or failure. The default
+int p(char* filename){
+    printf("parse!\n");
+
+    //create tok_pointer
+    struct token* tok = malloc(sizeof(struct token));
+
+    int code;
+
+    //set up scanner
+    if(code = setup_scanner(filename)){
+        return code;
+    }
+
+    //setup parser
+    if(code = setup_parser(tok)){
+        return code;
+    }
+
+    printf("setup finished!\n");
+
+    int32_t n_ops = parse();
+
+    print_IR();
+    
     return 0;
 }
 
@@ -67,57 +95,57 @@ int parse(char* filename){
 
 int main(int argc, char* argv[]){
     //flags
-    uint8_t h = 0;
-    uint8_t s = 0;
-    uint8_t r = 0;
-    uint8_t p = 0;
+    uint8_t h_flag = 0;
+    uint8_t s_flag = 0;
+    uint8_t r_flag = 0;
+    uint8_t p_flag = 0;
 
     //check arguments
     for(int i = 1; i < argc; i += 2){
         char* word = argv[i];
         if(!strcmp(word, "-h")){
-            h = i;
+            h_flag = i;
             break;
         }
         else if(!strcmp(word, "-s")){
-            s = i;
+            s_flag = i;
         }
         else if(!strcmp(word, "-p")){
-            p = i;
+            p_flag = i;
         }
         else if(!strcmp(word, "-r")){
-            r = i;
+            r_flag = i;
         }
         else if(i == 1 && argc == 2){
             break;
         }
         else{
             printf("Bad arguments!\n");
-            h = 1;
+            h_flag = 1;
             break;
         }
     }
 
     //process flags
     int code = 0;
-    if(h){
-        help();
+    if(h_flag){
+        h();
     }
-    else if(r && r < (argc - 1)){
-        code = rep(argv[r + 1]);
+    else if(r_flag && r_flag < (argc - 1)){
+        code = r(argv[r_flag + 1]);
     }
-    else if(p && p < (argc - 1)){
-        code = parse(argv[p + 1]);
+    else if(p_flag && p_flag < (argc - 1)){
+        code = p(argv[p_flag + 1]);
     }
-    else if(s && s < (argc - 1)){
-        code = scan(argv[s + 1]);
+    else if(s_flag && s_flag < (argc - 1)){
+        code = s(argv[s_flag + 1]);
     }
     else if(argc == 2){
-        code = parse(argv[1]);
+        code = p(argv[1]);
     }
     else{
         printf("Bad Arguments!\n");
-        help();
+        h();
     }
 
     return code;
