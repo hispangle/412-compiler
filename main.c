@@ -8,7 +8,7 @@ extern struct token get_next_token();
 void print_token(struct token tok){
     //tok type needs to be checked for number name (CONST or REG)
     if(tok.type != CONSTANT && tok.type != REGISTER){
-        printf("type: %i or %s, name: %i or %s\n", tok.type, TOKEN_TYPES[tok.type], tok.name, TOKEN_NAMES[tok.type][tok.name]);
+        printf("type: %i or %s, name: %i or %s\n", tok.type, TOKEN_TYPES[tok.type], tok.name, TOKEN_NAMES[tok.name]);
     } else{
         printf("type: %i or %s, name: %i\n", tok.type, TOKEN_TYPES[tok.type], tok.name);
     }
@@ -64,13 +64,10 @@ int s(char* filename){
 
 //function that parses the program, builds the IR, and reports success or failure. The default
 int p(char* filename){
-    printf("parse!\n");
-
     //create tok_pointer
     struct token* tok = malloc(sizeof(struct token));
 
     int code;
-
     //set up scanner
     if(code = setup_scanner(filename)){
         return code;
@@ -81,12 +78,14 @@ int p(char* filename){
         return code;
     }
 
-    printf("setup finished!\n");
+    //parse
+    int32_t n_ops;
+    if((n_ops = parse()) != -1){
+        printf("Parse succeeded. Processed %i operations.\n", n_ops);
+        // printf("IR:\n");
+        // print_IR();
+    }
 
-    int32_t n_ops = parse();
-
-    print_IR();
-    
     return 0;
 }
 

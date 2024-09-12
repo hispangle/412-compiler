@@ -3,6 +3,8 @@
 
 //need to make sure no possibility of out of bounds / segfault
 
+//MAKE MORE DESCRIPTIVE ERRORS
+
 //how tokens are structured
 struct token {
     uint8_t type; //anything in token_types, but declared as uint8_t for size
@@ -66,63 +68,45 @@ enum token_types{
     ERROR
 };
 
-//remove the second array (just delete purple braces)
-
 //lexeme of tokens
 //matches TOKEN_TYPES order
-const char* TOKEN_NAMES[][5] = {
-    {"load", "store"},
-    {"loadI"},
-    {","},
-    {""},
-    {"add", "sub", "mult", "lshift", "rshift"},
-    {"output"},
-    {"nop"},
-    {},
-    {},
-    {"=>"},
-    {"\\n"},
-    {"Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"}
+const char* TOKEN_NAMES[] = {
+    "load", "store",
+    "loadI",
+    ",",
+    "eof",
+    "add", "sub", "mult", "lshift", "rshift",
+    "output",
+    "nop",
+    "0",
+    "0",
+    "=>",
+    "\\n",
+    "Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"
 };
 
 //enumerates the index of each word
 //just for readability
 //matches with the list above
 enum token_names{
-    load = 0,
+    load,
     store,
-    loadI = 0,
-    comma = 0,
-    eof = 0,
-    add = 0,
+    loadI,
+    comma,
+    eof,
+    add,
     sub,
     mult,
     lshift,
     rshift,
-    output = 0,
-    nop = 0,
-    into = 0,
-    eol = 0,
-    spelling = 0,
+    output,
+    nop,
+    constant,
+    reg, //register not liked
+    into,
+    eol,
+    spelling,
     overflow,
     invalid_op,
     invalid_sentence
 };
-
-
-
-
-//op codes
-enum OPCODES{
-    LOAD,
-    //LOADI,
-    STORE = 2,
-    ADD,
-    SUB,
-    //OUTPUT,
-    //NOP,
-    MULT = 7,
-    LSHIFT,
-    RSHIFT,
-
-}

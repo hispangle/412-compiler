@@ -18,7 +18,7 @@ struct token* cur_tok;
 
 //keep track of line number and op num
 uint32_t line_num = 1;
-int32_t op_num = 1;
+int32_t op_num = 0;
 
 //flag for first error
 uint8_t err_found = 0;
@@ -44,12 +44,14 @@ void add_IR(struct IR* ir){
 
 //prints errors
 //can be made inline
-void print_error(){
+void print_error(uint32_t name){
+    //test if parse found errors at start or end
+    //maybe not necessary if stderr
     if(!err_found){
         printf("Parse found errors.\n");
         err_found = 1;
     }
-    printf("ERROR:%i %s\n", line_num, TOKEN_NAMES[ERROR][cur_tok->name]);
+    fprintf(stderr, "ERROR %i: \t%s\n", line_num, TOKEN_NAMES[name]);
 }
 
 //creates the internal representation
@@ -58,72 +60,408 @@ void print_error(){
 int32_t parse(){
     //get first token
     *cur_tok = get_next_token();
-
+    struct IR* ir;
     //normal loop
-    while(cur_tok->type != EoF){
+    while(cur_tok->type != EoF && !err_found){
         // //print token for now
         // if(cur_tok->type != CONSTANT && cur_tok->type != REGISTER){
-        //     printf("TOKEN FOUND: type: %i or %s, name: %i or %s\n", cur_tok->type, TOKEN_TYPES[cur_tok->type], cur_tok->name, TOKEN_NAMES[cur_tok->type][cur_tok->name]);
+        //     printf("TOKEN FOUND: type: %i or %s, name: %i or %s\n", cur_tok->type, TOKEN_TYPES[cur_tok->type], cur_tok->name, TOKEN_NAMES[cur_tok->name]);
         // } else{
         //     printf("TOKEN FOUND: type: %i or %s, name: %i\n", cur_tok->type, TOKEN_TYPES[cur_tok->type], cur_tok->name);
         // }
 
-
+        
         switch(cur_tok->type){
             case MEMOP:
+                ir = get_next_IR_loc();
+                ir->opcode = cur_tok->name;
+                switch((*cur_tok = get_next_token()).type){
+                    case REGISTER:
+                        ir->arg1.SR = cur_tok->name;
+                        
+                        switch((*cur_tok = get_next_token()).type){
+                            case INTO:
+                                switch((*cur_tok = get_next_token()).type){
+                                    case REGISTER:
+                                        ir->arg3.SR = cur_tok->name;
+                                        switch((*cur_tok = get_next_token()).type){
+                                            case EOL:
+                                                add_IR(ir);
+                                                break;
+                                            case ERROR:
+                                                print_error(cur_tok->name);
+                                            default:
+                                                print_error(invalid_sentence);
+                                        }
+                                        break;
+                                    case ERROR:
+                                        print_error(cur_tok->name);
+                                    default:
+                                        print_error(invalid_sentence);
+                                }
+                                break;
+                            
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+
+
+                        break;
+
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+                op_num += 1;
                 break;
             case LOADI:
-                break;
-            case ARITHOP:
-                break;
-            case OUTPUT:
-                break;
-            case NOP:
+                ir = get_next_IR_loc();
+                ir->opcode = cur_tok->name;
                 switch((*cur_tok = get_next_token()).type){
-                    case EOL:
-                        //build IR
-                        ; //fuck c
-                        struct IR* ir = get_next_IR_loc();
-                        ir->opcode = nop;
-                        add_IR(ir);
-                        printf("%i\n", nop);
-                        printf("opcode: %i, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
+                    case CONSTANT:
+                        ir->arg1.SR = cur_tok->name;
+                        switch((*cur_tok = get_next_token()).type){
+                            case INTO:
+                                switch((*cur_tok = get_next_token()).type){
+                                    case REGISTER:
+                                        ir->arg3.SR = cur_tok->name;
+                                        switch((*cur_tok = get_next_token()).type){
+                                            case EOL:
+                                                add_IR(ir);
+                                                break;
+                                            case ERROR:
+                                                print_error(cur_tok->name);
+                                            default:
+                                                print_error(invalid_sentence);
+                                        }
+                                        break;
+                                    case ERROR:
+                                        print_error(cur_tok->name);
+                                    default:
+                                        print_error(invalid_sentence);
+                                }
+                                break;
+                            
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+
+
                         break;
+
                     case ERROR:
-                        print_error();
+                        print_error(cur_tok->name);
                     default:
-                        cur_tok->type = ERROR;
-                        cur_tok->name = invalid_sentence;
-                        print_error();
+                        print_error(invalid_sentence);
                 }
 
+                op_num += 1;
+                break;
+            case ARITHOP:
+                ir = get_next_IR_loc();
+                ir->opcode = cur_tok->name;
+                switch((*cur_tok = get_next_token()).type){
+                    case REGISTER:
+                        ir->arg1.SR = cur_tok->name;
+                        switch((*cur_tok = get_next_token()).type){
+                            case COMMA:
+                                switch((*cur_tok = get_next_token()).type){
+                                    case REGISTER:
+                                        ir->arg2.SR = cur_tok->name;
+                                        switch((*cur_tok = get_next_token()).type){
+                                            case INTO:
+                                                switch((*cur_tok = get_next_token()).type){
+                                                    case REGISTER:
+                                                        ir->arg3.SR = cur_tok->name;
+                                                        switch((*cur_tok = get_next_token()).type){
+                                                            case EOL:
+                                                                add_IR(ir);
+                                                                break;
+                                                            case ERROR:
+                                                                print_error(cur_tok->name);
+                                                            default:
+                                                                print_error(invalid_sentence);
+                                                        }
+                                                        break;
+                                                    case ERROR:
+                                                        print_error(cur_tok->name);
+                                                    default:
+                                                        print_error(invalid_sentence);
+
+                                                }
+                                                
+                                                break;
+                                            case ERROR:
+                                                print_error(cur_tok->name);
+                                            default:
+                                                print_error(invalid_sentence);
+                                        }
+                                        break;
+                                    case ERROR:
+                                        print_error(cur_tok->name);
+                                    default:
+                                        print_error(invalid_sentence);
+                                }
+                                break;
+                            
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+
+
+                        break;
+
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+                op_num += 1;
+                break;
+            case OUTPUT:
+                ir = get_next_IR_loc();
+                ir->opcode = cur_tok->name;
+                switch((*cur_tok = get_next_token()).type){
+                    case CONSTANT:
+                        ir->arg1.SR = cur_tok->name;
+                        switch((*cur_tok = get_next_token()).type){
+                            case EOL:
+                                add_IR(ir);
+                                break;
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }     
+                        
+                op_num += 1;
+                break;
+            case NOP:
+                ir = get_next_IR_loc();
+                ir->opcode = nop;
+                switch((*cur_tok = get_next_token()).type){
+                    case EOL:
+                        //add IR
+                        add_IR(ir);
+                        //printf("%i\n", nop);
+                        //printf("opcode: %i, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+                op_num += 1;
+                
                 break;
             case EOL:
-                line_num += 1;
                 break;
             case ERROR:
-                print_error();
+                print_error(cur_tok->name);
                 break;
             default:
                 //must be not an op
-                cur_tok->type = ERROR;
-                cur_tok->name = invalid_op;
-                print_error();
+                print_error(invalid_op);
 
                 //get next line
                 *cur_tok = get_next_eol_token();
-                line_num += 1;
-
                 break; 
         }
 
-
+        line_num += 1;
         *cur_tok = get_next_token();
     }
 
 
     //error loop
-    //only needed if parsing too slow with additional if
+    while(cur_tok->type != EoF){
+        switch(cur_tok->type){
+            case MEMOP:
+                switch((*cur_tok = get_next_token()).type){
+                    case REGISTER:
+                        switch((*cur_tok = get_next_token()).type){
+                            case INTO:
+                                switch((*cur_tok = get_next_token()).type){
+                                    case REGISTER:
+                                        switch((*cur_tok = get_next_token()).type){
+                                            case EOL:
+                                                break;
+                                            case ERROR:
+                                                print_error(cur_tok->name);
+                                            default:
+                                                print_error(invalid_sentence);
+                                        }
+                                        break;
+                                    case ERROR:
+                                        print_error(cur_tok->name);
+                                    default:
+                                        print_error(invalid_sentence);
+                                }
+                                break;
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+                op_num += 1;
+                break;
+            case LOADI:
+                switch((*cur_tok = get_next_token()).type){
+                    case CONSTANT:
+                        switch((*cur_tok = get_next_token()).type){
+                            case INTO:
+                                switch((*cur_tok = get_next_token()).type){
+                                    case REGISTER:
+                                        switch((*cur_tok = get_next_token()).type){
+                                            case EOL:
+                                                break;
+                                            case ERROR:
+                                                print_error(cur_tok->name);
+                                            default:
+                                                print_error(invalid_sentence);
+                                        }
+                                        break;
+                                    case ERROR:
+                                        print_error(cur_tok->name);
+                                    default:
+                                        print_error(invalid_sentence);
+                                }
+                                break;
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+
+                op_num += 1;
+                break;
+            case ARITHOP:
+                switch((*cur_tok = get_next_token()).type){
+                    case REGISTER:
+                        switch((*cur_tok = get_next_token()).type){
+                            case COMMA:
+                                switch((*cur_tok = get_next_token()).type){
+                                    case REGISTER:
+                                        switch((*cur_tok = get_next_token()).type){
+                                            case INTO:
+                                                switch((*cur_tok = get_next_token()).type){
+                                                    case REGISTER:
+                                                        switch((*cur_tok = get_next_token()).type){
+                                                            case EOL:
+                                                                break;
+                                                            case ERROR:
+                                                                print_error(cur_tok->name);
+                                                            default:
+                                                                print_error(invalid_sentence);
+                                                        }
+                                                        break;
+                                                    case ERROR:
+                                                        print_error(cur_tok->name);
+                                                    default:
+                                                        print_error(invalid_sentence);
+
+                                                }
+                                                break;
+                                            case ERROR:
+                                                print_error(cur_tok->name);
+                                            default:
+                                                print_error(invalid_sentence);
+                                        }
+                                        break;
+                                    case ERROR:
+                                        print_error(cur_tok->name);
+                                    default:
+                                        print_error(invalid_sentence);
+                                }
+                                break;
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+
+                op_num += 1;
+                break;
+            case OUTPUT:
+                switch((*cur_tok = get_next_token()).type){
+                    case CONSTANT:
+                        switch((*cur_tok = get_next_token()).type){
+                            case EOL:
+                                break;
+                            case ERROR:
+                                print_error(cur_tok->name);
+                            default:
+                                print_error(invalid_sentence);
+                        }
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }     
+                        
+                op_num += 1;
+                break;
+            case NOP:
+                switch((*cur_tok = get_next_token()).type){
+                    case EOL:
+                        break;
+                    case ERROR:
+                        print_error(cur_tok->name);
+                    default:
+                        print_error(invalid_sentence);
+                }
+
+                op_num += 1;
+                break;
+            case EOL:
+                break;
+            case ERROR:
+                print_error(cur_tok->name);
+                break;
+            default:
+                //must be not an op
+                print_error(invalid_op);
+
+                //get next line
+                *cur_tok = get_next_eol_token();
+                break; 
+        }
+
+        line_num += 1;
+        *cur_tok = get_next_token();
+    }
 
     //return -1 on error otherwise num ops
     return err_found ? -1 : op_num;
@@ -134,14 +472,13 @@ void print_IR(){
     int32_t n = 1;
     struct IR* ir = head->next;
     while(ir != head){
-        printf("opcode: %i, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
+        printf("opcode: %i or %s, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, TOKEN_NAMES[ir->opcode], ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
         ir = ir->next;
     }
 }
 
 
 //sets up parser
-
 int setup_parser(struct token* tok_pointer){
     cur_tok = tok_pointer;
 

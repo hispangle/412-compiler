@@ -321,7 +321,7 @@ int setup_scanner(char* filename){
 
         //s     2
         delta_char[2][NUMBER + 2 + 't' - 'a'] = 3; //st
-        delta_char[3][NUMBER + 2 + 'u' - 'a'] = 6; //su
+        delta_char[2][NUMBER + 2 + 'u' - 'a'] = 7; //su
         
         //st    3
         delta_char[3][NUMBER + 2 + 'o' - 'a'] = 4; //sto
@@ -367,7 +367,7 @@ int setup_scanner(char* filename){
         delta_char[16][NUMBER + 2 + 'f' - 'a'] = 17; //lshif
 
         //lshif 17
-        delta_char[17][NUMBER + 2 + 'h' - 'a'] = 18; //lshift
+        delta_char[17][NUMBER + 2 + 't' - 'a'] = 18; //lshift
 
         //lshift18
         //all errors
