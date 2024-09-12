@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = 
 LDFLAGS =
 OBJFILES = scanner.o main.o parser.o
-TARGET = fe412
+TARGET = 412fe
 build: $(TARGET)
 $(TARGET): $(OBJFILES)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJFILES) $(LDFLAGS)

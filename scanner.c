@@ -69,10 +69,27 @@ char get_next_char(){
 
 //moves to the next '\n'
 void get_next_line(){
-    while((cur_char = get_next_char()) != '\n' && cur_char != -1){
+    while(cur_char != '\n' && cur_char != -1){
+        cur_char = get_next_char();
     }
-    class = CHAR_CLASS[cur_char];
 }
+
+//skips all tokens until EOL
+//useful for long lines
+//maybe insert eol befor eof
+//lightly tested
+struct token get_next_eol_token(){
+    get_next_line();
+    cur_char = get_next_char();
+
+    //follow until whitespace is done
+    while(class == WHITESPACE){
+        cur_char = get_next_char();
+    }
+    struct token tok = {EOL, eol};
+    return tok;
+}
+
 
 
 //gets the next token
@@ -110,9 +127,14 @@ struct token get_next_token(){
     //and next char not a terminating character (like , or \t) or an error
 
 
-    //follow until whitespace is done
-    while(class == WHITESPACE){
+    //get next char if comment
+    if(state == 44){
+        state = delta_char[state][class];
         cur_char = get_next_char();
+        if(state == 49){
+            get_next_line();
+            cur_char = get_next_char();
+        }
     }
 
     //follow until new line or eof if comment, error, or overflow
@@ -120,13 +142,14 @@ struct token get_next_token(){
     //make sure to get next char and class after
     //change number to correct one with proper table
     //can be different with a double buffer or line reader
-    if(state == 49 || state == 0 || state == 47){
+    if(state == 0 || state == 47){
         get_next_line();
     }
 
-    //finish getting class
-    //can be put in while and if to save time
-    //class = CHAR_CLASS[cur_char];
+    //follow until whitespace is done
+    while(class == WHITESPACE){
+        cur_char = get_next_char();
+    }
 
     //classify based on state
     uint8_t type;
@@ -185,11 +208,12 @@ struct token get_next_token(){
             type = OUTPUT;
             name = output;
             break;
-        case 47:
+        case 47: //overflow
             type = ERROR;
             name = overflow;
             break;
         case 48: //eol
+        case 49: ////
             type = EOL;
             name = eol;
             break;
@@ -216,20 +240,13 @@ struct token get_next_token(){
         default: 
             type = ERROR;
             name = spelling;
+            get_next_line();
     }
+    
     struct token tok = {type, name};
     return tok;
 }
 
-//skips all tokens until EOL
-//useful for long lines
-//maybe insert eol befor eof
-//lightly tested
-struct token get_next_eol_token(){
-    get_next_line();  
-    struct token tok = {EOL, eol};
-    return tok;
-}
 
 
 //does any initialization
@@ -277,7 +294,7 @@ int setup_scanner(char* filename){
     //open file
     file = fopen(filename, "r");
     if(file == NULL){
-        printf("file %s unable to be opened.\n", filename);
+        fprintf(stderr, "ERROR: file %s unable to be opened.\n", filename);
         return -1;
     }
 

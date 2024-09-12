@@ -31,6 +31,7 @@ int32_t op_num = 0;
 
 //flag for first error
 uint8_t err_found = 0;
+uint8_t new_err = 0;
 
 //keep track of head and last IR
 struct IR* head;
@@ -54,6 +55,9 @@ void add_IR(struct IR* ir){
 //prints errors
 //can be made inline
 void print_error(uint32_t name){
+    //new error found
+    new_err = 1;
+
     //test if parse found errors at start or end
     //maybe not necessary if stderr
     if(!err_found){
@@ -272,14 +276,16 @@ int32_t parse(){
                 break;
             case ERROR:
                 print_error(cur_tok->name);
-                break;
             default:
                 //must be not an op
                 print_error(invalid_op);
+        }
 
-                //get next line
-                *cur_tok = get_next_eol_token();
-                break; 
+        //go to new line if any errors were detected
+        if(new_err){
+            *cur_tok = get_next_eol_token();
+            new_err = 0;
+            continue;
         }
 
         line_num += 1;
@@ -450,16 +456,20 @@ int32_t parse(){
                 break;
             case ERROR:
                 print_error(cur_tok->name);
-                break;
             default:
                 //must be not an op
                 print_error(invalid_op);
 
-                //get next line
-                *cur_tok = get_next_eol_token();
-                break; 
         }
 
+        //go to new line if any errors were detected
+        if(new_err){
+            *cur_tok = get_next_eol_token();
+            new_err = 0;
+            continue;
+        }
+
+        //eol must have been reached
         line_num += 1;
         *cur_tok = get_next_token();
     }
@@ -472,7 +482,7 @@ int32_t parse(){
 void print_IR(){
     struct IR* ir = head->next;
     while(ir != head){
-        printf("opcode: %i or %s, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, TOKEN_NAMES[ir->opcode], ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
+        //printf("opcode: %i or %s, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, TOKEN_NAMES[ir->opcode], ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
         ir = ir->next;
     }
 }
