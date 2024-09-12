@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include "constants.h"
 
 //need to make sure no possibility of out of bounds / segfault
@@ -9,10 +8,10 @@
 //put class finding in get_char and get_line?
 
 //have flag if eol already inserted before eof //prevents inf loop
-uint8_t eolInserted = 0;
+uint8_t eol_inserted = 0;
 
 //global token pointer
-struct token* cur_tok;
+//struct token* cur_tok;
 
 //global current class and char
 static uint8_t class;
@@ -34,8 +33,8 @@ enum classes{
     OVERFLOW = 47,
     INVALID = 0,
     FSLASH,
-    //COMMA = 2, //COMMA excluded, included already in token_types
-    //EoF = 3 //EoF excluded, already in token_types
+    //COMMA = 2,
+    //EoF = 3,
     NL = 4,
     CF,
     WHITESPACE,
@@ -204,13 +203,13 @@ struct token get_next_token(){
             break;
         case 52: //eof
             //insert 1 eol before eof
-            if(eolInserted){
+            if(eol_inserted){
                 type = EoF;
                 name = eof;
             } else{
                 type = EOL;
                 name = eol;
-                eolInserted = 1;
+                eol_inserted = 1;
             }
             
             break;

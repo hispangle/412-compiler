@@ -1,3 +1,7 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include "constants.h"
+
 //change tok to global pointer in scanner
 //get_tok changes contents but not pointer
 //allows use of same pointer in parser
@@ -12,6 +16,11 @@
 //then full groups as needed
 
 //allocate space for IR at setup and in larger chunks after (exponential i think) (1k, 2k, 4k, 8k, etc)
+
+//externs
+extern struct token get_next_token();
+extern struct token get_next_eol_token();
+extern const char* TOKEN_NAMES[];
 
 //global token pointer but declared
 struct token* cur_tok;
@@ -63,14 +72,6 @@ int32_t parse(){
     struct IR* ir;
     //normal loop
     while(cur_tok->type != EoF && !err_found){
-        // //print token for now
-        // if(cur_tok->type != CONSTANT && cur_tok->type != REGISTER){
-        //     printf("TOKEN FOUND: type: %i or %s, name: %i or %s\n", cur_tok->type, TOKEN_TYPES[cur_tok->type], cur_tok->name, TOKEN_NAMES[cur_tok->name]);
-        // } else{
-        //     printf("TOKEN FOUND: type: %i or %s, name: %i\n", cur_tok->type, TOKEN_TYPES[cur_tok->type], cur_tok->name);
-        // }
-
-        
         switch(cur_tok->type){
             case MEMOP:
                 ir = get_next_IR_loc();
@@ -469,7 +470,6 @@ int32_t parse(){
 
 //prints ir
 void print_IR(){
-    int32_t n = 1;
     struct IR* ir = head->next;
     while(ir != head){
         printf("opcode: %i or %s, sr1: %i, sr2: %i, sr3: %i\n", ir->opcode, TOKEN_NAMES[ir->opcode], ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);

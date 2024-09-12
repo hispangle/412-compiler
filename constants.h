@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 //constants or structs to be used in multiple files
 //can also be thought of as translations from int to string (factorizing)
 
@@ -34,22 +36,22 @@ struct IR {
 
 
 
-//token type
-//matches with TOKEN_NAMES
-const char* TOKEN_TYPES[] = {
-    "MEMOP",
-    "LOADI",
-    "COMMA",
-    "EOF",
-    "ARITHOP",
-    "OUTPUT",
-    "NOP",
-    "CONSTANT",
-    "REGISTER",
-    "INTO",
-    "EOL",
-    "ERROR"
-};
+// //token type
+// //matches with TOKEN_NAMES
+// const char* TOKEN_TYPES[] = {
+//     "MEMOP",
+//     "LOADI",
+//     "COMMA",
+//     "EOF",
+//     "ARITHOP",
+//     "OUTPUT",
+//     "NOP",
+//     "CONSTANT",
+//     "REGISTER",
+//     "INTO",
+//     "EOL",
+//     "ERROR"
+// };
 
 //enumerates index of each type
 //just for readability
@@ -68,22 +70,22 @@ enum token_types{
     ERROR
 };
 
-//lexeme of tokens
-//matches TOKEN_TYPES order
-const char* TOKEN_NAMES[] = {
-    "load", "store",
-    "loadI",
-    ",",
-    "eof",
-    "add", "sub", "mult", "lshift", "rshift",
-    "output",
-    "nop",
-    "0",
-    "0",
-    "=>",
-    "\\n",
-    "Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"
-};
+// //lexeme of tokens
+// //matches TOKEN_TYPES order
+// const char* TOKEN_NAMES[] = {
+//     "load", "store",
+//     "loadI",
+//     ",",
+//     "eof",
+//     "add", "sub", "mult", "lshift", "rshift",
+//     "output",
+//     "nop",
+//     "0",
+//     "0",
+//     "=>",
+//     "\\n",
+//     "Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"
+// };
 
 //enumerates the index of each word
 //just for readability

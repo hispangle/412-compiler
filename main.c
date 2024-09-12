@@ -1,8 +1,50 @@
-#include "scanner.c"
-#include "parser.c"
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include "constants.h"
 
+//externs
 extern int setup_scanner(char* filename);
+extern int setup_parser(struct token* filename);
 extern struct token get_next_token();
+extern int32_t parse();
+
+//globals
+//token type
+//matches with TOKEN_NAMES
+const char* TOKEN_TYPES[] = {
+    "MEMOP",
+    "LOADI",
+    "COMMA",
+    "EOF",
+    "ARITHOP",
+    "OUTPUT",
+    "NOP",
+    "CONSTANT",
+    "REGISTER",
+    "INTO",
+    "EOL",
+    "ERROR"
+};
+
+//lexeme of tokens
+//matches TOKEN_TYPES order
+const char* TOKEN_NAMES[] = {
+    "load", "store",
+    "loadI",
+    ",",
+    "eof",
+    "add", "sub", "mult", "lshift", "rshift",
+    "output",
+    "nop",
+    "0",
+    "0",
+    "=>",
+    "\\n",
+    "Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"
+};
+
 
 //prints token
 void print_token(struct token tok){
@@ -28,12 +70,12 @@ int r(char* filename){
     struct token* tok = malloc(sizeof(struct token));
 
     int code;
-    if(code = setup_scanner(filename)){
+    if((code = setup_scanner(filename))){
         return code;
     }
 
     //setup parser
-    if(code = setup_parser(tok)){
+    if((code = setup_parser(tok))){
         return code;
     }
 
@@ -44,7 +86,7 @@ int r(char* filename){
 int s(char* filename){
     printf("scan!\n");
     int code;
-    if(code = setup_scanner(filename)){
+    if((code = setup_scanner(filename))){
         return code;
     }
 
@@ -69,12 +111,12 @@ int p(char* filename){
 
     int code;
     //set up scanner
-    if(code = setup_scanner(filename)){
+    if((code = setup_scanner(filename))){
         return code;
     }
 
     //setup parser
-    if(code = setup_parser(tok)){
+    if((code = setup_parser(tok))){
         return code;
     }
 
