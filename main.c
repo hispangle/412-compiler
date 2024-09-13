@@ -9,6 +9,10 @@ extern int setup_scanner(char* filename);
 extern int setup_parser(struct token* filename);
 extern struct token get_next_token();
 extern int32_t parse();
+extern struct IR* head;
+
+//line num for s
+uint32_t nline = 0;
 
 //globals
 //token type
@@ -34,7 +38,7 @@ const char* TOKEN_NAMES[] = {
     "load", "store",
     "loadI",
     ",",
-    "eof",
+    "",
     "add", "sub", "mult", "lshift", "rshift",
     "output",
     "nop",
@@ -46,17 +50,6 @@ const char* TOKEN_NAMES[] = {
 };
 
 
-//prints token
-void print_token(struct token tok){
-    //tok type needs to be checked for number name (CONST or REG)
-    if(tok.type != CONSTANT && tok.type != REGISTER){
-        printf("type: %i or %s, name: %i or %s\n", tok.type, TOKEN_TYPES[tok.type], tok.name, TOKEN_NAMES[tok.name]);
-    } else{
-        printf("type: %i or %s, name: %i\n", tok.type, TOKEN_TYPES[tok.type], tok.name);
-    }
-}
-
-
 //function that displays help for commandline args
 void h(){
     printf("help!\n");
@@ -64,8 +57,6 @@ void h(){
 
 //function that displays the internal representation of the program
 int r(char* filename){
-    printf("rep!\n");
-    
     //create tok_pointer
     struct token* tok = malloc(sizeof(struct token));
 
@@ -79,27 +70,63 @@ int r(char* filename){
         return code;
     }
 
+    if(parse() == -1){
+        return -1;
+    }
+
+    //print IR
+    struct IR* ir = head->next;
+    while(ir != head){
+        switch(ir->opcode){
+            case load:
+            case store:
+            case loadI:
+                printf("%s\t [ sr %i ], [  ], [ sr %i ]\n", TOKEN_NAMES[ir->opcode], ir->arg1.SR, ir->arg3.SR);
+                break;
+            case output:
+                printf("%s\t [ sr %i ], [  ], [  ]\n", TOKEN_NAMES[ir->opcode], ir->arg1.SR);
+                break;
+            case nop:
+                printf("%s\t [  ], [  ], [  ]\n", TOKEN_NAMES[ir->opcode]);
+                break;
+            default:
+                printf("%s\t [ sr %i ], [ sr %i ], [ sr %i ]\n", TOKEN_NAMES[ir->opcode], ir->arg1.SR, ir->arg2.SR, ir->arg3.SR);
+                break;
+        }
+
+        ir = ir->next;
+    }
+
     return 0;
 }
 
 //function that scans the program and displays tokens
 int s(char* filename){
-    printf("scan!\n");
     int code;
     if((code = setup_scanner(filename))){
         return code;
     }
 
-    printf("setup finished!\n");
-
-    struct token tok = get_next_token();
+    //print tokens
+    struct token tok;
     while(tok.type != EoF){
         //tok type needs to be checked for number name (CONST or REG)
-        print_token(tok);
+        //printf("new tok\n");
+        //printf("print! d\n");
         tok = get_next_token();
-    }
+        
+        //tok type needs to be checked for number name (CONST or REG)
+        if(tok.type != CONSTANT && tok.type != REGISTER){
+            printf("%i: < %s, \"%s\" >\n", nline, TOKEN_TYPES[tok.type], TOKEN_NAMES[tok.name]);
+        } else{
+            printf("%i: < %s, \"%s%i\" >\n", nline, TOKEN_TYPES[tok.type], tok.type == CONSTANT ? "" : "r", tok.name);
+        }
 
-    print_token(tok);
+        //increment line number
+        if(tok.type == EOL){
+            nline += 1;
+        }
+    }
 
     return 0;
 }
@@ -124,8 +151,6 @@ int p(char* filename){
     int32_t n_ops;
     if((n_ops = parse()) != -1){
         printf("Parse succeeded. Processed %i operations.\n", n_ops);
-        // printf("IR:\n");
-        // print_IR();
     }
 
     return 0;
@@ -144,24 +169,26 @@ int main(int argc, char* argv[]){
     //check arguments
     for(int i = 1; i < argc; i += 2){
         char* word = argv[i];
-        if(!strcmp(word, "-h")){
-            h_flag = i;
-            break;
-        }
-        else if(!strcmp(word, "-s")){
-            s_flag = i;
-        }
-        else if(!strcmp(word, "-p")){
-            p_flag = i;
-        }
-        else if(!strcmp(word, "-r")){
-            r_flag = i;
+        if(word[0] == '-'){
+            if(strchr(word, 'h')){
+                h_flag = i;
+                break;
+            }
+            if(strchr(word, 's')){
+                s_flag = i;
+            }
+            if(strchr(word, 'p')){
+                p_flag = i;
+            }
+            if(strchr(word, 'r')){
+                r_flag = i;
+            }
         }
         else if(i == 1 && argc == 2){
             break;
         }
         else{
-            printf("Bad arguments!\n");
+            fprintf(stderr, "Bad arguments!\n");
             h_flag = 1;
             break;
         }
@@ -185,7 +212,7 @@ int main(int argc, char* argv[]){
         code = p(argv[1]);
     }
     else{
-        printf("Bad Arguments!\n");
+        fprintf(stderr, "ERROR: Bad Arguments!\n");
         h();
     }
 

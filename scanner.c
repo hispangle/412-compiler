@@ -3,11 +3,8 @@
 #include <stdio.h>
 #include "constants.h"
 
-//need to make sure no possibility of out of bounds / segfault
-//HANDLE WHITESPACE AT START OF THING (done)
-//put class finding in get_char and get_line?
 
-//have flag if eol already inserted before eof //prevents inf loop
+//have flag if eol already inserted before eof
 uint8_t eol_inserted = 0;
 
 //global token pointer
@@ -81,11 +78,6 @@ void get_next_line(){
 struct token get_next_eol_token(){
     get_next_line();
     cur_char = get_next_char();
-
-    //follow until whitespace is done
-    while(class == WHITESPACE){
-        cur_char = get_next_char();
-    }
     struct token tok = {EOL, eol};
     return tok;
 }
@@ -94,23 +86,19 @@ struct token get_next_eol_token(){
 
 //gets the next token
 //ignores further characters in a line if there is an error
-//right now is a dowhile
-//changed to normal while and go backwards 1 spot if unoptimal
 //return nothing and change contents of cur_tok if inefficient
 struct token get_next_token(){
     uint8_t state = 1; //default is 1, 0 is error
     uint32_t num = 0;
 
+    //ignore any initial whitespace
+    while(class == WHITESPACE){
+        cur_char = get_next_char();
+    }
+
     //follows table rep of dfa
-    //needs to build numbers
     do{
-        //printf("class: %i, cur_char: %c, state: %i, num: %i\n", class, cur_char, state, num);
         //builds number
-        //if slow, pulled out for 1 if every token instead of an if every character
-        //pull out 'r' as well
-        //or build number every character if thats good enough
-        //make sure size check is correct
-        //make sure error is displayed correctly (size not spelling)
         if(class == NUMBER){
             if((MAX_CONST - (cur_char - '0')) / 10 < num){ //can be optimized with an array if needed
                 state = OVERFLOW;
@@ -122,12 +110,10 @@ struct token get_next_token(){
 
         state = delta_char[state][class];
         cur_char = get_next_char();
-        //class = CHAR_CLASS[cur_char];
     } while (state < 47 && class > 7); //not a self terminating state (like , or // or an error) 
     //and next char not a terminating character (like , or \t) or an error
 
-
-    //get next char if comment
+    //handle / case
     if(state == 44){
         state = delta_char[state][class];
         cur_char = get_next_char();
@@ -137,18 +123,9 @@ struct token get_next_token(){
         }
     }
 
-    //follow until new line or eof if comment, error, or overflow
-    //return here
-    //make sure to get next char and class after
-    //change number to correct one with proper table
-    //can be different with a double buffer or line reader
+    //follow until new line or eof if error or overflow
     if(state == 0 || state == 47){
         get_next_line();
-    }
-
-    //follow until whitespace is done
-    while(class == WHITESPACE){
-        cur_char = get_next_char();
     }
 
     //classify based on state
@@ -235,14 +212,12 @@ struct token get_next_token(){
                 name = eol;
                 eol_inserted = 1;
             }
-            
             break;
         default: 
             type = ERROR;
             name = spelling;
             get_next_line();
     }
-    
     struct token tok = {type, name};
     return tok;
 }
@@ -250,10 +225,8 @@ struct token get_next_token(){
 
 
 //does any initialization
-//CAN BE MOVED IF NECESSARY
 int setup_scanner(char* filename){
     //initialize CHAR_CLASS
-    //maybe do array pointer stuff instead of malloc if slow?
     {
         //give space to array
         CHAR_CLASS = malloc(sizeof(uint8_t) * 257);
@@ -300,19 +273,12 @@ int setup_scanner(char* filename){
 
     //initialize character states
     cur_char = get_next_char(); //here bc my function is a do while
-    while(class == WHITESPACE){//ignore any initial whitespace
-        cur_char = get_next_char();
-    }
-    //class = CHAR_CLASS[cur_char]; //also here bc do while
 
     //create dfa table
     //assumes whitespace after op necessary
     //if no assumption, endings are self terminating states
     //load and loadI special cases, maybe think about it idk its not necessary
-    //bc d is not necessarily self terminating
     //I similar to /?
-    //d self terminating in all cases except I
-    //special I class?
     //not thinking about it more 
     {
         //err   0

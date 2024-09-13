@@ -1,9 +1,6 @@
 #include <stdint.h>
 
 //constants or structs to be used in multiple files
-//can also be thought of as translations from int to string (factorizing)
-
-//need to make sure no possibility of out of bounds / segfault
 
 //MAKE MORE DESCRIPTIVE ERRORS
 

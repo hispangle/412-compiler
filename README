@@ -2,11 +2,7 @@
 //NETID:agm6
 
 //TODO: finish readme
-//do -h output
-//do -r output
-//do -s output
 //clean up code
-//add more descriptive errors
-//cross check reference more
+//check reference more
 
 //AT THE END: add remove hidden files + folders to makefile

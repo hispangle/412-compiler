@@ -7,4 +7,6 @@ build: $(TARGET)
 $(TARGET): $(OBJFILES)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJFILES) $(LDFLAGS)
 clean:
-	rm -f $(OBJFILES) $(TARGET) *~
+	rm -f $(OBJFILES) $(TARGET) *~ agm6.tar
+tar:
+	tar cvf agm6.tar scanner.c main.c constants.h parser.c makefile README
