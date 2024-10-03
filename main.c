@@ -9,10 +9,9 @@ extern int setup_scanner(char* filename);
 extern int setup_parser(struct token* filename);
 extern struct token get_next_token();
 extern int32_t parse();
+extern int rename_registers(int32_t n_ops);
 extern struct IR* head;
 
-//line num for s
-uint32_t nline = 0;
 
 //globals
 //token type
@@ -52,7 +51,22 @@ const char* TOKEN_NAMES[] = {
 
 //function that displays help for commandline args
 void h(){
-    printf("help!\n");
+    printf("Help for 412fe (412 Front End):\n");
+    printf("Command syntax:\n");
+    printf("./412fe [optional flags] <filename>\n");
+    printf("\n");
+    printf("\t<filename>: The file where the ILOC program is stored. 412fe will print an error if file cannot be accessed.\n");
+    printf("\n");
+    printf("Optional Flags:\n");
+    printf("\tFlags are displayed in order of priority. Only one flag will be processed.\n");
+    printf("\n");
+    printf("\t-h: Displays this help text. Ignores any file given.\n");
+    printf("\n");
+    printf("\t-r: Parses the ILOC program given at filename, and displays the Intermediate Representation. \n\t\tPrints errors to stderr upon error discovery.\n");
+    printf("\n");
+    printf("\t-p: Parses the ILOC program given at filename. Displays number of operations parsed on success. Prints errors to stderr on failure.\n");
+    printf("\n");
+    printf("\t-s: Scans the ILOC program given at filename. Prints all tokens found.\n");
 }
 
 //function that displays the internal representation of the program
@@ -107,6 +121,9 @@ int s(char* filename){
         return code;
     }
 
+    //hold line num
+    uint32_t nline = 1;
+
     //print tokens
     struct token tok;
     while(tok.type != EoF){
@@ -159,17 +176,81 @@ int p(char* filename){
 
 
 
+int x(char* filename){
+    //create tok_pointer
+    struct token* tok = malloc(sizeof(struct token));
+
+    int code;
+    //set up scanner
+    if((code = setup_scanner(filename))){
+        return code;
+    }
+
+    //setup parser
+    if((code = setup_parser(tok))){
+        return code;
+    }
+
+    //parse
+    int32_t n_ops = parse();
+    if(n_ops == -1){
+        return -1;
+    }
+    rename_registers(n_ops);
+
+
+    //print valid ILOC
+    struct IR* node = head->next;
+    while(node != head){
+        printf("%s ", TOKEN_NAMES[node->opcode]);
+
+        switch(node->opcode){
+            case load:
+            case store:
+                printf("r%i => r%i", node->arg1.VR, node->arg3.VR);
+                break;
+            case loadI:
+                printf("%i => r%i", node->arg1.VR, node->arg3.VR);
+                break;
+            case add:
+            case sub:
+            case mult:
+            case lshift:
+            case rshift:
+                printf("r%i, r%i => r%i", node->arg1.VR, node->arg2.VR, node->arg3.VR);
+                break;
+            case output:
+                printf("%i", node->arg1.VR);
+                break;
+            case nop:
+                break;
+            default:
+                ;
+        }
+        printf("\n");
+        node = node->next;
+    }
+
+
+    return 0;
+}
+
+
 int main(int argc, char* argv[]){
     //flags
     uint8_t h_flag = 0;
     uint8_t s_flag = 0;
     uint8_t r_flag = 0;
     uint8_t p_flag = 0;
+    uint8_t x_flag = 0;
 
     //check arguments
     for(int i = 1; i < argc; i += 2){
         char* word = argv[i];
         if(word[0] == '-'){
+            if(strchr(word, 'x')){
+                x_flag = i;
+            }
             if(strchr(word, 'h')){
                 h_flag = i;
                 break;
@@ -198,6 +279,9 @@ int main(int argc, char* argv[]){
     int code = 0;
     if(h_flag){
         h();
+    }
+    else if(x_flag && x_flag < (argc - 1)){
+        code = x(argv[x_flag + 1]);
     }
     else if(r_flag && r_flag < (argc - 1)){
         code = r(argv[r_flag + 1]);

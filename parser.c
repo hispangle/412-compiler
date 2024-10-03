@@ -105,7 +105,7 @@ int32_t parse(){
     *cur_tok = get_next_token();
     struct IR* ir;
     //normal loop
-    while(cur_tok->type != EoF && !err_found){
+    while(cur_tok->type != EoF){
         switch(cur_tok->type){
             case MEMOP: //MEMOP
                 ir = get_next_IR_loc();
@@ -484,6 +484,8 @@ int32_t parse(){
         *cur_tok = get_next_token();
     }
 
+    //set heads prev at the finale
+    head->prev = current;
     //return -1 on error otherwise num ops
     return err_found ? -1 : op_num;
 }

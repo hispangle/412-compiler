@@ -1,12 +1,12 @@
 CC = gcc
 CFLAGS = 
 LDFLAGS =
-OBJFILES = scanner.o main.o parser.o
-TARGET = 412fe
+OBJFILES = scanner.o main.o parser.o renamer.o
+TARGET = 412alloc
 build: $(TARGET)
 $(TARGET): $(OBJFILES)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJFILES) $(LDFLAGS)
 clean:
-	rm -f $(OBJFILES) $(TARGET) *~ agm6.tar
+	rm -f $(OBJFILES) $(TARGET) *~ agm6.tar core.*
 tar:
 	tar cvf agm6.tar scanner.c main.c constants.h parser.c makefile README
