@@ -51,9 +51,9 @@ const char* TOKEN_NAMES[] = {
 
 //function that displays help for commandline args
 void h(){
-    printf("Help for 412fe (412 Front End):\n");
+    printf("Help for 412alloc (412 Register Allocator):\n");
     printf("Command syntax:\n");
-    printf("./412fe [optional flags] <filename>\n");
+    printf("./412alloc [optional flags] <filename>\n");
     printf("\n");
     printf("\t<filename>: The file where the ILOC program is stored. 412fe will print an error if file cannot be accessed.\n");
     printf("\n");
@@ -61,6 +61,8 @@ void h(){
     printf("\tFlags are displayed in order of priority. Only one flag will be processed.\n");
     printf("\n");
     printf("\t-h: Displays this help text. Ignores any file given.\n");
+    printf("\n");
+    printf("\t-x: Parses the ILOC program given at filename, and displays the same program with virtual registers instead of given registers. \n\t\tPrints errors to stderr on failure.\n");
     printf("\n");
     printf("\t-r: Parses the ILOC program given at filename, and displays the Intermediate Representation. \n\t\tPrints errors to stderr upon error discovery.\n");
     printf("\n");

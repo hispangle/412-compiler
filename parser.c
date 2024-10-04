@@ -42,7 +42,6 @@ struct IR* get_next_IR_loc(){
 //adds IR to linked list
 void add_IR(struct IR* ir){
     ir->prev = current;
-    ir->next = head;
     current->next = ir;
     current = ir;
 }
@@ -104,6 +103,7 @@ int32_t parse(){
     //get first token
     *cur_tok = get_next_token();
     struct IR* ir;
+    
     //normal loop
     while(cur_tok->type != EoF){
         switch(cur_tok->type){
@@ -486,6 +486,8 @@ int32_t parse(){
 
     //set heads prev at the finale
     head->prev = current;
+    current->next = head;
+
     //return -1 on error otherwise num ops
     return err_found ? -1 : op_num;
 }
@@ -497,6 +499,12 @@ int setup_parser(struct token* tok_pointer){
 
     //create empty head
     struct IR* ir = malloc(sizeof(struct IR));
+
+    //check null
+    if(ir == NULL){
+        return -1;
+    }
+
     ir->next = ir;
     ir->prev = ir;
 
