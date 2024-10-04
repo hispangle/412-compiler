@@ -1,38 +1,56 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "constants.h"
 
 extern struct IR* head;
-uint32_t max_SR;
 uint32_t neg1 = (-1);
-
-//finds info from linked list
-//perhaps find it in the parser and pass / global it
-//perhaps put in head
-void findMaxSR(){
-    struct IR* node = head->next;
-    while(node != head){
-        //find max SR
-        node->arg1.SR > max_SR ? max_SR = node->arg1.SR : 1;
-        node->arg2.SR > max_SR ? max_SR = node->arg2.SR : 1;
-        node->arg3.SR > max_SR ? max_SR = node->arg3.SR : 1;
-
-        node = node->next;
-    }
-}
 
 
 //conducts the renaming
+//returns the max virtual register name on success
+//returns -1 on failure
 int rename_registers(int32_t n_ops){
-    findMaxSR();
+    uint32_t max_SR = 0;
+    struct IR* node;
+    for(node = head->next; node != head; node = node->next){    
+        switch(node->opcode){
+            case load:
+            case store:
+                if(node->arg1.SR > max_SR) max_SR = node->arg1.SR;
+                if(node->arg3.SR > max_SR) max_SR = node->arg3.SR;
+                break;
+            case loadI:
+                if(node->arg3.SR > max_SR) max_SR = node->arg3.SR;
+                break;
+            case add:
+            case sub:
+            case mult:
+            case lshift:
+            case rshift:
+                if(node->arg1.SR > max_SR) max_SR = node->arg1.SR;
+                if(node->arg2.SR > max_SR) max_SR = node->arg2.SR;
+                if(node->arg3.SR > max_SR) max_SR = node->arg3.SR;
+                break;
+            case output:
+            case nop:
+            default:
+                break;
+        }
+    }
     
     //initializes vectors
-    //ASSUMES VR MAX IS 2^32 - 2
+    //ASSUMES VR MAX IS 2^32 - 2 (valid bc n_ops is int32_t)
     //invalid = neg1 = 2^32 - 1
-    uint32_t* SRtoVR = malloc(sizeof(uint32_t) * max_SR);
-    uint32_t* LU = malloc(sizeof(uint32_t) * max_SR);
+    uint32_t* SRtoVR = malloc(sizeof(uint32_t) * (max_SR + 1));
+    uint32_t* LU = malloc(sizeof(uint32_t) * (max_SR + 1));
 
+    //check null
+    if(SRtoVR == NULL || LU == NULL){
+        return -1;
+    }
+    
     //sets invalid
-    for(uint32_t i = 0; i < max_SR; i++){
+    for(uint32_t i = 0; i <= max_SR; i++){
         SRtoVR[i] = neg1;
         LU[i] = neg1;
     }
@@ -43,8 +61,7 @@ int rename_registers(int32_t n_ops){
     //main OP loop
     //equivalent to while(node != head)
     //blocks are 0 indexed
-    //unsure if correct for lab (1 indexed in alg)
-    struct IR* node = head->prev;
+    node = head->prev;
     for(int32_t index = n_ops - 1; index >= 0; index--){
         //different number of arguments for different op codes
         struct argument* def_arg = &(node->arg3);
@@ -52,12 +69,8 @@ int rename_registers(int32_t n_ops){
         struct argument* use_arg2 = &(node->arg2);
         switch(node->opcode){
             case load:
-
-                                ;
-
                 ///handle def
                 //unused def
-                
                 if(SRtoVR[def_arg->SR] == neg1){
                     SRtoVR[def_arg->SR] = VRName;
                     VRName++;
@@ -87,11 +100,6 @@ int rename_registers(int32_t n_ops){
                 LU[use_arg1->SR] = index;
                 break;
             case store:
-                ;
-
-
-
-
                 ///handle use
                 //last use
                 if(SRtoVR[use_arg1->SR] == neg1){
@@ -107,9 +115,8 @@ int rename_registers(int32_t n_ops){
                 LU[use_arg1->SR] = index;
 
 
-                                ///handle def
+                ///handle def (considered a use in store)
                 //unused def
-                
                 if(SRtoVR[def_arg->SR] == neg1){
                     SRtoVR[def_arg->SR] = VRName;
                     VRName++;
@@ -200,8 +207,6 @@ int rename_registers(int32_t n_ops){
             case output:
                 //propagate the constant
                 node->arg1.VR = node->arg1.SR;
-
-                
                 break;
 
             case nop:
@@ -210,8 +215,11 @@ int rename_registers(int32_t n_ops){
             default:
                 break;
         }
+        
         node = node->prev;
     }
+
+    return VRName;
 }
 
 

@@ -196,9 +196,10 @@ int x(char* filename){
     if(n_ops == -1){
         return -1;
     }
+
+    //rename registers
     rename_registers(n_ops);
-
-
+    
     //print valid ILOC
     struct IR* node = head->next;
     while(node != head){
@@ -302,3 +303,42 @@ int main(int argc, char* argv[]){
 
     return code;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // switch(node->opcode){
+        //     case load:
+        //     case store:
+        //     case loadI:
+        //     case add:
+        //     case sub:
+        //     case mult:
+        //     case lshift:
+        //     case rshift:
+        //     case output:
+        //     case nop:
+        //     default:
+        //         break;
+        // }
