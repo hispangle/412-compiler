@@ -16,6 +16,7 @@ struct argument {
     uint32_t VR;
     uint32_t PR;
     uint32_t NU;
+    uint8_t isLU;
 };
 
 //IR

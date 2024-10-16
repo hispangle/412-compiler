@@ -9,7 +9,8 @@ extern int setup_scanner(char* filename);
 extern int setup_parser(struct token* filename);
 extern struct token get_next_token();
 extern int32_t parse();
-extern int rename_registers(int32_t n_ops);
+extern int rename_registers(int32_t n_ops, uint32_t* maxvr, uint32_t* maxlive_ptr);
+extern int allocate(int k, int32_t n_ops);
 extern struct IR* head;
 
 
@@ -200,7 +201,11 @@ int x(char* filename){
     }
 
     //rename registers
-    rename_registers(n_ops);
+    uint32_t maxvr = 0;
+    uint32_t maxlive = 0;
+    if(rename_registers(n_ops, &maxvr, &maxlive) == -1){
+        return -1;
+    }
     
     //print valid ILOC
     struct IR* node = head->next;
@@ -239,6 +244,68 @@ int x(char* filename){
 }
 
 
+int k(uint32_t k_reg, char* filename){
+        //create tok_pointer
+    struct token* tok = malloc(sizeof(struct token));
+
+    int code;
+    //set up scanner
+    if((code = setup_scanner(filename))){
+        return code;
+    }
+
+    //setup parser
+    if((code = setup_parser(tok))){
+        return code;
+    }
+
+    //parse
+    int32_t n_ops = parse();
+    if(n_ops == -1){
+        return -1;
+    }
+
+    if(allocate(k_reg, n_ops) == -1){
+        return -1;
+    }
+
+    //print valid ILOC
+    struct IR* node = head->next;
+    while(node != head){
+        printf("%s ", TOKEN_NAMES[node->opcode]);
+
+        switch(node->opcode){
+            case load:
+            case store:
+                printf("r%i => r%i", node->arg1.PR, node->arg3.PR);
+                break;
+            case loadI:
+                printf("%i => r%i", node->arg1.PR, node->arg3.PR);
+                break;
+            case add:
+            case sub:
+            case mult:
+            case lshift:
+            case rshift:
+                printf("r%i, r%i => r%i", node->arg1.PR, node->arg2.PR, node->arg3.PR);
+                break;
+            case output:
+                printf("%i", node->arg1.PR);
+                break;
+            case nop:
+                break;
+            default:
+                ;
+        }
+        printf("\n");
+        node = node->next;
+    }
+
+}
+
+//TODO: clean up parse to not have an extern setup
+//TODO: clean up scan and parse code (mainly variables and global things)
+//TODO: determine if passing in head is better than global (ehhhhhhh)
 int main(int argc, char* argv[]){
     //flags
     uint8_t h_flag = 0;
@@ -246,6 +313,11 @@ int main(int argc, char* argv[]){
     uint8_t r_flag = 0;
     uint8_t p_flag = 0;
     uint8_t x_flag = 0;
+    uint8_t k_flag = 0;
+
+    //k
+    uint32_t k_reg = 0;
+
 
     //check arguments
     for(int i = 1; i < argc; i += 2){
@@ -272,6 +344,16 @@ int main(int argc, char* argv[]){
             break;
         }
         else{
+            if(!k_flag){
+                k_reg = atoi(word);
+                if(k_reg >= 3 && k_reg <= 64){
+                    k_flag = i;
+                    continue;
+                }
+            }
+
+
+
             fprintf(stderr, "Bad arguments!\n");
             h_flag = 1;
             break;
@@ -282,6 +364,9 @@ int main(int argc, char* argv[]){
     int code = 0;
     if(h_flag){
         h();
+    }
+    else if(k_flag && k_flag < (argc - 1)){
+        code = k(k_reg, argv[k_flag + 1]);
     }
     else if(x_flag && x_flag < (argc - 1)){
         code = x(argv[x_flag + 1]);
