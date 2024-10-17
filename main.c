@@ -272,14 +272,16 @@ int k(uint32_t k_reg, char* filename){
     //print valid ILOC
     struct IR* node = head->next;
     while(node != head){
-        printf("%s ", TOKEN_NAMES[node->opcode]);
+        
 
         switch(node->opcode){
             case load:
             case store:
+                printf("%s ", TOKEN_NAMES[node->opcode]);
                 printf("r%i => r%i", node->arg1.PR, node->arg3.PR);
                 break;
             case loadI:
+                printf("%s ", TOKEN_NAMES[node->opcode]);
                 printf("%i => r%i", node->arg1.PR, node->arg3.PR);
                 break;
             case add:
@@ -287,9 +289,11 @@ int k(uint32_t k_reg, char* filename){
             case mult:
             case lshift:
             case rshift:
+                printf("%s ", TOKEN_NAMES[node->opcode]);
                 printf("r%i, r%i => r%i", node->arg1.PR, node->arg2.PR, node->arg3.PR);
                 break;
             case output:
+                printf("%s ", TOKEN_NAMES[node->opcode]);
                 printf("%i", node->arg1.PR);
                 break;
             case nop:

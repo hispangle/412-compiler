@@ -108,7 +108,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                 def_arg->VR = SRtoVR[def_arg->SR];
                 def_arg->NU = LU[def_arg->SR];
 
-                //save the VR def
+                //updateMaps the VR def
                 VRtoDef[def_arg->VR] = node;
 
                 //reduce nlive bc not used above a def
@@ -126,7 +126,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                     SRtoVR[use_arg1->SR] = VRName;
                     VRName++;
 
-                    //saves location of this last use
+                    //updateMapss location of this last use
                     use_arg1->isLU = 1;
 
                     //VR live above its last use
@@ -153,16 +153,16 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                     SRtoVR[use_arg1->SR] = VRName;
                     VRName++;
 
-                    //saves location of this last use
+                    //updateMapss location of this last use
                     use_arg1->isLU = 1;
 
                     //VR live above its last use
                     nlive++;
 
-                    //checks for maxlive on next one
-                    // if(nlive > maxlive){
-                    //     maxlive = nlive;
-                    // }
+                    //checks if max
+                    if(nlive > maxlive){
+                        maxlive = nlive;
+                    }
                 }
 
                 //set VR and NU
@@ -180,7 +180,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                     SRtoVR[def_arg->SR] = VRName;
                     VRName++;
 
-                    //saves location of this last use
+                    //updateMapss location of this last use
                     def_arg->isLU = 1;
 
                     //VR live above its last use
@@ -230,7 +230,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                 def_arg->VR = SRtoVR[def_arg->SR];
                 def_arg->NU = LU[def_arg->SR];
 
-                //save the VR def
+                //updateMaps the VR def
                 VRtoDef[def_arg->VR] = node;
 
                 //reduce nlive bc not used above a def
@@ -267,7 +267,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                 def_arg->VR = SRtoVR[def_arg->SR];
                 def_arg->NU = LU[def_arg->SR];
 
-                //save the VR def
+                //updateMaps the VR def
                 VRtoDef[def_arg->VR] = node;
 
                 //reduce nlive bc not used above a def
@@ -285,7 +285,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                     SRtoVR[use_arg1->SR] = VRName;
                     VRName++;
 
-                    //saves location of this last use
+                    //updateMapss location of this last use
                     use_arg1->isLU = 1;
 
                     //VR live above its last use
@@ -311,7 +311,7 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
                     SRtoVR[use_arg2->SR] = VRName;
                     VRName++;
 
-                    //saves location of this last use
+                    //updateMapss location of this last use
                     use_arg2->isLU = 1;
 
                     //VR live above its last use
@@ -396,6 +396,91 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
     return 0;
 }
 
+uint8_t isRematable(uint8_t VR, uint8_t* VRtoPR){
+    struct IR* node = VRtoDef[VR];
+
+
+    //declare vars used for while
+    struct argument* use1 = NULL;
+    struct argument* use2 = NULL;
+    struct argument* def = NULL;
+
+        //grab the use and def args where applicable 
+    switch(node->opcode){
+            case load:
+                use1 = &(node->arg1);
+                break;
+            case store:
+                use1 = &(node->arg1);
+                use2 = &(node->arg3);
+                break;
+            case loadI:
+                break;
+            case add:
+            case sub:
+            case mult:
+            case lshift:
+            case rshift:
+                use1 = &(node->arg1);
+                use2 = &(node->arg2);
+                break;
+            case output:
+                break;
+            case nop:
+                break;
+            default:
+                break;
+        
+    }
+
+    //check if both uses are still held in PRs
+    if(use1 != NULL && VRtoPR[use1->VR] == 65){
+        return 0;
+    }
+
+    if(use2 != NULL && VRtoPR[use2->VR] == 65){
+        return 0;
+    }
+
+    //if so it is rematable
+    return 1;
+}
+
+//copies opcode and VR only, inserts correct PR
+void copy(struct IR* new, struct IR* old, uint8_t* VRtoPR){
+    //copy opcode
+    new->opcode = old->opcode;
+
+    //copy VR
+    new->arg1.VR = old->arg1.VR;
+    new->arg2.VR = old->arg2.VR;
+    new->arg3.VR = old->arg3.VR;
+
+    //get PR based on opcode
+    switch(new->opcode){
+        case loadI: 
+            new->arg3.PR = VRtoPR[old->arg3.VR];
+        case output:
+            //propagate constant
+            new->arg1.PR = old->arg1.VR;
+            break;
+        case add:
+        case sub:
+        case mult:
+        case rshift:
+        case lshift:
+            new->arg2.PR = VRtoPR[old->arg2.VR];
+            //printf("new arg2 PR: %i\n", new->arg2.PR);
+        case load:
+        case store:
+            new->arg1.PR = VRtoPR[old->arg1.VR];
+            //printf("new arg1 PR: %i\n", new->arg1.PR);
+            new->arg3.PR = VRtoPR[old->arg3.VR];
+            //printf("new arg3 PR: %i\n", new->arg3.PR);
+        default:
+            break;
+    }
+}
 
 
 //allocates physical registers to the ILOC block
@@ -443,7 +528,10 @@ int allocate(int k, int32_t n_ops){
     //declares maps used in maxlive > k cases
     uint32_t* VRtoSpill;
     uint32_t spill_loc = 32768;
-    uint8_t* VRNeedsRestore;
+
+    struct IR** VRtoRemat;
+    uint32_t* VRtoOldVR;
+    uint8_t* VRtoOldPR;
 
     uint32_t* PRtoNU;
 
@@ -458,31 +546,52 @@ int allocate(int k, int32_t n_ops){
         PR_stack_size--; 
         PR_stack++;
 
-        //initialize
+        //initialize arrays
         VRtoSpill = malloc(sizeof(uint32_t) * maxVR);
-        VRNeedsRestore = malloc(sizeof(uint8_t) * maxVR);
+        VRtoRemat = malloc(sizeof(struct IR*) * maxVR);
+        VRtoOldPR = malloc(sizeof(uint8_t) * maxVR);
+        VRtoOldVR = malloc(sizeof(uint32_t) * maxVR);
         PRtoNU = malloc(sizeof(uint32_t) * k);
         PR_queue = malloc(sizeof(uint8_t) * k);
 
+        //initialize pointers
         PR_queue_start = PR_queue;
         PR_queue_end = PR_queue;
 
         //null checks
-        if(VRtoSpill == NULL || PRtoNU == NULL || PR_queue == NULL || VRNeedsRestore == NULL){
+        if(VRtoSpill == NULL || PRtoNU == NULL || PR_queue == NULL){
             return -1;
         }
 
     }
 
+
+    //declare vars used for while
+    struct argument* use1;
+    struct argument* use2;
+    struct argument* def;
+
+    uint8_t PR;
+    uint32_t VR;
+
+    int updateMaps;
+    int VRNeedsPR;
+    uint8_t markedPR;
+
+
     //go thru all ops in order
+    //printf("max: %i\n", maxlive);
+    uint32_t index = 0;
     struct IR* node = head->next;
     while(node != head){
-        
+        //printf("yipee\n");
 
-        struct argument* use1 = NULL;
-        struct argument* use2 = NULL;
-        struct argument* def = NULL;
+        //set args to NULL
+        use1 = NULL;
+        use2 = NULL;
+        def = NULL;
 
+        //grab the use and def args where applicable 
         switch(node->opcode){
             case load:
                 use1 = &(node->arg1);
@@ -522,21 +631,29 @@ int allocate(int k, int32_t n_ops){
         
         }
 
-        //declare vars
-        uint8_t PR;
-        uint32_t VR;
 
-        //set PR
-        //use1
-        uint8_t PRUsed = 65;
+        //marker that prevents use2 from spilling use1
+        markedPR = 65; 
+
+
+        ////set PRs
+
+        //set PR for use1
         if(use1 != NULL){
+            //sets indicators for actions later
+            updateMaps = 1;
+            VRNeedsPR = 0;
+
+            //grabs VR and PR
             VR = use1->VR;
             PR = VRtoPR[VR];
-            int save = 1;
 
-                
             //no PR assigned
             if(PR == 65){
+                //sets indicator
+                VRNeedsPR = 1;
+
+                //assign PR with algorithm based on maxlive and k
                 if(maxlive > k){ //spillable getPR
                     //check if undefed use
                     if(use1->NU == 0){
@@ -553,7 +670,7 @@ int allocate(int k, int32_t n_ops){
                         newLoadI->next = node;
                         newLoadI->prev = prev;
 
-                        save = 0;
+                        updateMaps = 0;
                         PR = k - 1;
                     } else if(PR_stack_size > 0){ //grab from stack if possible
                         PR_stack_size--;
@@ -563,7 +680,7 @@ int allocate(int k, int32_t n_ops){
                         PR = *PR_queue_start;
                         PR_queue_start += 1;
 
-                        //maintain mod of queue
+                        //maintain queue bounds
                         if(PR_queue_start >= PR_queue + k){ //make sure this math and check is correct
                             PR_queue_start = PR_queue;
                         } 
@@ -573,112 +690,212 @@ int allocate(int k, int32_t n_ops){
                         VRtoPR[VR_old] = 65;
                         PRtoNU[PR] = use1->NU;
                     } else { //spill
-                        uint8_t maxPR = 0;
-                        uint32_t maxNU = 0;
-                        for(int i = 0; i < k - 1; i++){
-                            if(PRtoNU[i] > maxNU){
-                                maxPR = i;
-                                maxNU = PRtoNU[i];
-                            }
-                        }
-
-                        PR = maxPR; //pick PR to spill (PR with max PRtoNU) //will be more complex in the future
+                        //pick PR to spill (PR with max PRtoNU) //will be more complex in the future
                         //insert the loadI and store //WILL CHANGE LATER DO THIS FOR NOW
                         //                           //can delay inserting loadI and store if rematable rn
                         //                           //must store location of spill to be able to spill here if not rematable later
                         //                           //struct IR* VRtoSpillInsert, where loadI and store inserted as VRto...[VR]->next
                         //                           //on spill insertion, set VRto...[VR] to NULL
+                        uint8_t maxPR = 0;
+                        uint32_t maxNU = 0;
 
-                        //create loadI
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = spill_loc;
-                        (&(newLoadI->arg3))->PR = k - 1;
+                        uint32_t minNU = UINT32_MAX;
+                        uint8_t minPR = 65;
+                        for(int i = 0; i < k - 1; i++){
+                            if(PRtoNU[i] > maxNU){
+                                maxPR = i;
+                                maxNU = PRtoNU[i];
+                            }
 
-                        //create store
-                        struct IR* newStore = malloc(sizeof(struct IR));
-                        newStore->opcode = store;
-                        (&(newStore->arg1))->PR = PR;
-                        (&(newStore->arg3))->PR = k - 1;
+                            if(PRtoNU[i] < minNU && isRematable(PRtoVR[i], VRtoPR)){
+                                minNU = PRtoNU[i];
+                                minPR = i;
+                            }
+                        }
+                        PR = maxPR; 
 
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newStore;
-                        newLoadI->next = newStore;
-                        newLoadI->prev = prev;
-                        newStore->next = node;
-                        newStore->prev = newLoadI;
-
-
-                        //remove old values
                         uint32_t VR_old = PRtoVR[PR];
-                        VRtoSpill[VR_old] = spill_loc;
-                        spill_loc += 4;
+                        ///spill insertion
+                        //check if rematerializable
+                        if(minPR != 65){
+                            //add prev to VRtoRemat
+                            VRtoRemat[VR_old] = node->prev;
+                            VRtoOldPR[VR_old] = PR;
+                            //printf("check me out! im rematable!\n");
+                        } else {
+                            //do current spill
+
+                                                    //create loadI
+                            struct IR* newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = spill_loc;
+                            (&(newLoadI->arg3))->PR = k - 1;
+
+                            //create store
+                            struct IR* newStore = malloc(sizeof(struct IR));
+                            newStore->opcode = store;
+                            (&(newStore->arg1))->PR = PR;
+                            (&(newStore->arg3))->PR = k - 1;
+
+                            //insert into ILOC
+                            struct IR* prev = node->prev;
+                            prev->next = newLoadI;
+                            node->prev = newStore;
+                            newLoadI->next = newStore;
+                            newLoadI->prev = prev;
+                            newStore->next = node;
+                            newStore->prev = newLoadI;
+
+
+                            //set spill location
+                            VRtoSpill[VR_old] = spill_loc;
+                            spill_loc += 4;
+                        }
+
+
+
                         
-                        VRNeedsRestore[VR_old] = 1;
+                        //remove old values
                         VRtoPR[VR_old] = 65;
                         PRtoNU[PR] = use1->NU;
                     }
-
-
-
-
                 } else { //nonspillable getPR
                     PR_stack_size--;
                     PR = PR_stack[PR_stack_size];
                 }
 
-                //if reserve register wasnt used
-                if(save){
+                //update maps if reserve register wasnt used
+                if(updateMaps){
                     //write VR and PR maps
                     VRtoPR[VR] = PR;
                     PRtoVR[PR] = VR;
                 }
-                
             }
 
             //check if restore needed
-            if(maxlive > k && VRNeedsRestore[VR]){
-                //reset restore
-                VRNeedsRestore[VR] = 0;
+            if(maxlive > k && (VRtoSpill[VR] || VRtoRemat[VR] != NULL) && VRNeedsPR){
+                //check remat
+                if(VRtoRemat[VR] != NULL){
+                    if(isRematable(VR, VRtoPR)){
+                        //printf("rematting use 1!!\n");
+                        //rematerialize
+                        struct IR* newDef = malloc(sizeof(struct IR));
+                        copy(newDef, VRtoDef[VR], VRtoPR);
 
-                //create loadI
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = VRtoSpill[VR];
-                        (&(newLoadI->arg3))->PR = k - 1;
+                        //insert before node
+                        node->prev->next = newDef;
+                        newDef->prev = node->prev;
+                        newDef->next = node;
+                        node->prev = newDef;
+                        
+                        //remove the spill location
+                        VRtoRemat[VR] = NULL;
+                    } else { //must insert the spill
+                        //printf("remat failed :(\n");
+                            //create loadI
+                            struct IR* newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = spill_loc;
+                            (&(newLoadI->arg3))->PR = k - 1;
 
-                        //create store
-                        struct IR* newLoad = malloc(sizeof(struct IR));
-                        newLoad->opcode = load;
-                        (&(newLoad->arg1))->PR = k - 1;
-                        (&(newLoad->arg3))->PR = PR;
+                            //create store
+                            struct IR* newStore = malloc(sizeof(struct IR));
+                            newStore->opcode = store;
+                            (&(newStore->arg1))->PR = VRtoOldPR[VR];
+                            (&(newStore->arg3))->PR = k - 1;
 
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newLoad;
-                        newLoadI->next = newLoad;
-                        newLoadI->prev = prev;
-                        newLoad->next = node;
-                        newLoad->prev = newLoadI;
+                            //insert into ILOC
+                            struct IR* prev = VRtoRemat[VR];
+                            struct IR* next = prev->next;
+                            prev->next = newLoadI;
+                            next->prev = newStore;
+                            newLoadI->next = newStore;
+                            newLoadI->prev = prev;
+                            newStore->next = next;
+                            newStore->prev = newLoadI;
+
+
+                            //set spill location
+                            VRtoSpill[VR] = spill_loc;
+                            spill_loc += 4;
+
+                            //restore();
+                            newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = VRtoSpill[VR];
+                            (&(newLoadI->arg3))->PR = k - 1;
+
+                            //create store
+                            struct IR* newLoad = malloc(sizeof(struct IR));
+                            newLoad->opcode = load;
+                            (&(newLoad->arg1))->PR = k - 1;
+                            (&(newLoad->arg3))->PR = PR;
+                            PRtoNU[PR] = index; //should be next line, maybe keep index
+
+                            //insert into ILOC
+                            prev = node->prev;
+                            prev->next = newLoadI;
+                            node->prev = newLoad;
+                            newLoadI->next = newLoad;
+                            newLoadI->prev = prev;
+                            newLoad->next = node;
+                            newLoad->prev = newLoadI;
+                    }
+
+                } else { //else do current restore
+                    //restore();
+                    //restore
+                    //create loadI
+                    struct IR* newLoadI= malloc(sizeof(struct IR));
+                    newLoadI->opcode = loadI;
+                    (&(newLoadI->arg1))->PR = VRtoSpill[VR];
+                    (&(newLoadI->arg3))->PR = k - 1;
+
+                    //create store
+                    struct IR* newLoad = malloc(sizeof(struct IR));
+                    newLoad->opcode = load;
+                    (&(newLoad->arg1))->PR = k - 1;
+                    (&(newLoad->arg3))->PR = PR;
+                    PRtoNU[PR] = index; //should be next line, maybe keep index
+
+                    //insert into ILOC
+                    struct IR* prev = node->prev;
+                    prev->next = newLoadI;
+                    node->prev = newLoad;
+                    newLoadI->next = newLoad;
+                    newLoadI->prev = prev;
+                    newLoad->next = node;
+                    newLoad->prev = newLoadI;
+                }
+
+                
+
+                
             }
+
+            //sets PR where needed
             use1->PR = PR;
-            PRUsed = PR;
+            markedPR = PR;
         }
 
-        
-
-
-        //use2
+        //printf("finished use 1\n");
+        //set PR for use2
         if(use2 != NULL){
+            //sets indicators for actions later
+            updateMaps = 1;
+            VRNeedsPR = 0;
+
+            //grabs VR and PR
             VR = use2->VR;
             PR = VRtoPR[VR];
-            int save = 1;
-            
+
+            //printf("check use 2 ass\n");
             //no PR assigned
             if(PR == 65){
+                //sets indicator
+                VRNeedsPR = 1;
+
+                //assign PR with algorithm based on maxlive and k
                 if(maxlive > k){ //spillable getPR
                     //check if undefed use
                     if(use2->NU == 0){
@@ -695,7 +912,7 @@ int allocate(int k, int32_t n_ops){
                         newLoadI->next = node;
                         newLoadI->prev = prev;
 
-                        save = 0;
+                        updateMaps = 0;
                         PR = k - 1;
                     } else if(PR_stack_size > 0){ //grab from stack if possible
                         PR_stack_size--;
@@ -705,7 +922,7 @@ int allocate(int k, int32_t n_ops){
                         PR = *PR_queue_start;
                         PR_queue_start += 1;
 
-                        //maintain mod of queue
+                        //maintain queue bounds
                         if(PR_queue_start >= PR_queue + k){ //make sure this math and check is correct
                             PR_queue_start = PR_queue;
                         } 
@@ -715,50 +932,72 @@ int allocate(int k, int32_t n_ops){
                         VRtoPR[VR_old] = 65;
                         PRtoNU[PR] = use2->NU;
                     } else { //spill
-                        uint8_t maxPR = 0;
-                        uint32_t maxNU = 0;
-                        for(int i = 0; i < k - 1; i++){
-                            if(PRtoNU[i] > maxNU && i != PRUsed){
-                                maxPR = i;
-                                maxNU = PRtoNU[i];
-                            }
-                        }
-                        PR = maxPR; //pick PR to spill (PR with max PRtoNU) //will be more complex in the future
-                        
+                        //pick PR to spill (PR with max PRtoNU) //will be more complex in the future
                         //insert the loadI and store //WILL CHANGE LATER DO THIS FOR NOW
                         //                           //can delay inserting loadI and store if rematable rn
                         //                           //must store location of spill to be able to spill here if not rematable later
                         //                           //struct IR* VRtoSpillInsert, where loadI and store inserted as VRto...[VR]->next
                         //                           //on spill insertion, set VRto...[VR] to NULL
+                        uint8_t maxPR = 0;
+                        uint32_t maxNU = 0;
 
-                        //create loadI
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = spill_loc;
-                        (&(newLoadI->arg3))->PR = k - 1;
+                        uint32_t minNU = UINT32_MAX;
+                        uint8_t minPR = 65;
+                        for(int i = 0; i < k - 1; i++){
+                            if(PRtoNU[i] > maxNU && i != markedPR){
+                                maxPR = i;
+                                maxNU = PRtoNU[i];
+                            }
 
-                        //create store
-                        struct IR* newStore = malloc(sizeof(struct IR));
-                        newStore->opcode = store;
-                        (&(newStore->arg1))->PR = PR;
-                        (&(newStore->arg3))->PR = k - 1;
+                            if(PRtoNU[i] < minNU && i != markedPR && isRematable(PRtoVR[i], VRtoPR)){
+                                minNU = PRtoNU[i];
+                                minPR = i;
+                            }
+                        }
+                        PR = maxPR; 
 
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newStore;
-                        newLoadI->next = newStore;
-                        newLoadI->prev = prev;
-                        newStore->next = node;
-                        newStore->prev = newLoadI;
-
-
-                        //remove old values
                         uint32_t VR_old = PRtoVR[PR];
-                        VRtoSpill[VR_old] = spill_loc;
-                        spill_loc += 4;
+                        ///spill insertion
+                        //check if rematerializable
+                        if(minPR != 65){
+                            //add prev to VRtoRemat
+                            VRtoRemat[VR_old] = node->prev;
+                            VRtoOldPR[VR_old] = PR;
+                            //printf("check me out! im rematable2!\n");
+                        } else {
+                            //do current spill
 
-                        VRNeedsRestore[VR_old] = 1;
+                                                    //create loadI
+                            struct IR* newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = spill_loc;
+                            (&(newLoadI->arg3))->PR = k - 1;
+
+                            //create store
+                            struct IR* newStore = malloc(sizeof(struct IR));
+                            newStore->opcode = store;
+                            (&(newStore->arg1))->PR = PR;
+                            (&(newStore->arg3))->PR = k - 1;
+
+                            //insert into ILOC
+                            struct IR* prev = node->prev;
+                            prev->next = newLoadI;
+                            node->prev = newStore;
+                            newLoadI->next = newStore;
+                            newLoadI->prev = prev;
+                            newStore->next = node;
+                            newStore->prev = newLoadI;
+
+
+                            //set spill location
+                            VRtoSpill[VR_old] = spill_loc;
+                            spill_loc += 4;
+                        }
+
+
+
+                        
+                        //remove old values
                         VRtoPR[VR_old] = 65;
                         PRtoNU[PR] = use2->NU;
                     }
@@ -767,61 +1006,146 @@ int allocate(int k, int32_t n_ops){
                     PR = PR_stack[PR_stack_size];
                 }
 
-                if(save){
-                    //write VR and PR maps
+                //update maps if reserve register wasnt used
+                if(updateMaps){
                     VRtoPR[VR] = PR;
                     PRtoVR[PR] = VR;
                 }
+            }
+            //printf("does use2 need a restore???\n");
+            //check if restore needed
+            if(maxlive > k && (VRtoSpill[VR] || VRtoRemat[VR] != NULL) && VRNeedsPR){
+                //check remat
+                if(VRtoRemat[VR] != NULL){
+                    if(isRematable(VR, VRtoPR)){
+                        //printf("rematting use 2!!\n");
+                        //rematerialize
+                        struct IR* newDef = malloc(sizeof(struct IR));
+                        copy(newDef, VRtoDef[VR], VRtoPR);
+                        //printf("VR1: %i, PR: %i", newDef->arg1.VR, newDef->arg1.PR);
 
+                        //insert before node
+                        node->prev->next = newDef;
+                        newDef->prev = node->prev;
+                        newDef->next = node;
+                        node->prev = newDef;
+                        
+                        //remove the spill location
+                        VRtoRemat[VR] = NULL;
+                    } else { //must insert the spill
+                        //printf("remat 2 failed :(\n");
+                            //create loadI
+                            struct IR* newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = spill_loc;
+                            (&(newLoadI->arg3))->PR = k - 1;
+
+                            //create store
+                            struct IR* newStore = malloc(sizeof(struct IR));
+                            newStore->opcode = store;
+                            (&(newStore->arg1))->PR = VRtoOldPR[VR];
+                            (&(newStore->arg3))->PR = k - 1;
+
+                            //insert into ILOC
+                            struct IR* prev = VRtoRemat[VR];
+                            struct IR* next = prev->next;
+                            prev->next = newLoadI;
+                            next->prev = newStore;
+                            newLoadI->next = newStore;
+                            newLoadI->prev = prev;
+                            newStore->next = next;
+                            newStore->prev = newLoadI;
+
+
+                            //set spill location
+                            VRtoSpill[VR] = spill_loc;
+                            spill_loc += 4;
+
+                            //restore();
+                            newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = VRtoSpill[VR];
+                            (&(newLoadI->arg3))->PR = k - 1;
+
+                            //create store
+                            struct IR* newLoad = malloc(sizeof(struct IR));
+                            newLoad->opcode = load;
+                            (&(newLoad->arg1))->PR = k - 1;
+                            (&(newLoad->arg3))->PR = PR;
+                            PRtoNU[PR] = index; //should be next line, maybe keep index
+
+                            //insert into ILOC
+                            prev = node->prev;
+                            prev->next = newLoadI;
+                            node->prev = newLoad;
+                            newLoadI->next = newLoad;
+                            newLoadI->prev = prev;
+                            newLoad->next = node;
+                            newLoad->prev = newLoadI;
+                    }
+
+                } else { //else do current restore
+                    //restore();
+                    //restore
+                    //create loadI
+                    struct IR* newLoadI= malloc(sizeof(struct IR));
+                    newLoadI->opcode = loadI;
+                    (&(newLoadI->arg1))->PR = VRtoSpill[VR];
+                    (&(newLoadI->arg3))->PR = k - 1;
+
+                    //create store
+                    struct IR* newLoad = malloc(sizeof(struct IR));
+                    newLoad->opcode = load;
+                    (&(newLoad->arg1))->PR = k - 1;
+                    (&(newLoad->arg3))->PR = PR;
+                    PRtoNU[PR] = index; //should be next line, maybe keep index
+
+                    //insert into ILOC
+                    struct IR* prev = node->prev;
+                    prev->next = newLoadI;
+                    node->prev = newLoad;
+                    newLoadI->next = newLoad;
+                    newLoadI->prev = prev;
+                    newLoad->next = node;
+                    newLoad->prev = newLoadI;
+                }
+
+                
+
+                
             }
 
-                        //check if restore needed
-            if(maxlive > k && VRNeedsRestore[VR]){
-                //reset restore
-                VRNeedsRestore[VR] = 0;
-                //create loadI
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = VRtoSpill[VR];
-                        (&(newLoadI->arg3))->PR = k - 1;
-
-                        //create store
-                        struct IR* newLoad = malloc(sizeof(struct IR));
-                        newLoad->opcode = load;
-                        (&(newLoad->arg1))->PR = k - 1;
-                        (&(newLoad->arg3))->PR = PR;
-
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newLoad;
-                        newLoadI->next = newLoad;
-                        newLoadI->prev = prev;
-                        newLoad->next = node;
-                        newLoad->prev = newLoadI;
-            }
+            //sets PR
             use2->PR = PR;
         }
 
 
-        //free if last use
-        //use1
+        ///free PR if last use
+
+        //free use1
         if(use1 != NULL){
-            
+            //check for last use
             if(use1->isLU){
+                //reobtain VR and PR
                 VR = use1->VR;
                 PR = use1->PR;
+
+                //free algorithm based on maxlive and k
                 if(maxlive > k){ //spillable free
-                    PR_stack[PR_stack_size] = PR;
-                    PR_stack_size++;
-                    PRtoVR[PR] = UINT32_MAX;
-                    VRtoPR[VR] = 65;
-                    // *PR_queue_end = PR;
-                    // PR_queue_end++;
-                    // if(PR_queue_end >= PR_queue + k){ //check for correctness
-                    //     PR_queue_end = PR_queue;
-                    // } 
+                    // //immediately place in stack again
+                    // PR_stack[PR_stack_size] = PR;
+                    // PR_stack_size++;
+                    // PRtoVR[PR] = UINT32_MAX;
+                    // VRtoPR[VR] = 65;
+
+                    //place PR in queue but do not remove its contents
+                    *PR_queue_end = PR;
+                    PR_queue_end++;
+                    if(PR_queue_end >= PR_queue + k){ //check for correctness
+                        PR_queue_end = PR_queue;
+                    } 
                 } else { //nonspillable free
+                    //immediately place in stack again
                     PR_stack[PR_stack_size] = PR;
                     PR_stack_size++;
                     PRtoVR[PR] = UINT32_MAX;
@@ -830,22 +1154,29 @@ int allocate(int k, int32_t n_ops){
             }
         }
 
-        //use2
+        //free use2
         if(use2 != NULL){
+            //reobtain VR and PR
             VR = use2->VR;
             PR = use2->PR;
+
+            //free algorithm based on maxlive and k
             if(use2->isLU){
                 if(maxlive > k){ //spillable free
-                    PR_stack[PR_stack_size] = PR;
-                    PR_stack_size++;
-                    PRtoVR[PR] = UINT32_MAX;
-                    VRtoPR[VR] = 65;
-                    // *PR_queue_end = PR;
-                    // PR_queue_end++;
-                    // if(PR_queue_end >= PR_queue + k){ //check for correctness
-                    //     PR_queue_end = PR_queue;
-                    // } 
+                    // //immediately place in stack again
+                    // PR_stack[PR_stack_size] = PR;
+                    // PR_stack_size++;
+                    // PRtoVR[PR] = UINT32_MAX;
+                    // VRtoPR[VR] = 65;
+
+                    //place PR in queue but do not remove its contents
+                    *PR_queue_end = PR;
+                    PR_queue_end++;
+                    if(PR_queue_end >= PR_queue + k){ //check for correctness
+                        PR_queue_end = PR_queue;
+                    } 
                 } else { //nonspillable free
+                    //immediately place in stack again
                     PR_stack[PR_stack_size] = PR;
                     PR_stack_size++;
                     PRtoVR[PR] = UINT32_MAX;
@@ -855,255 +1186,144 @@ int allocate(int k, int32_t n_ops){
         }
 
 
-        //def
+        //get PR for def
         if(def != NULL){
+            //sets indicators for actions later
+            updateMaps = 1;
+
+            //grabs VR and PR
             VR = def->VR;
-            int save = 1;
+            PR = VRtoPR[VR];
 
+            //assign PR with algorithm based on maxlive and k
             if(maxlive > k){ //spillable getPR
-                    //check if unused def
-                    if(def->NU == 0){
-                        //insert loadI 0 into reserve
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = 0;
-                        (&(newLoadI->arg3))->PR = k - 1;
+                //check if unused def
+                if(def->NU == 0){
+                    //insert loadI 0 into reserve
+                    struct IR* newLoadI= malloc(sizeof(struct IR));
+                    newLoadI->opcode = loadI;
+                    (&(newLoadI->arg1))->PR = 0;
+                    (&(newLoadI->arg3))->PR = k - 1;
 
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newLoadI;
-                        newLoadI->next = node;
-                        newLoadI->prev = prev;
+                    //insert into ILOC
+                    struct IR* prev = node->prev;
+                    prev->next = newLoadI;
+                    node->prev = newLoadI;
+                    newLoadI->next = node;
+                    newLoadI->prev = prev;
 
-                        save = 0;
-                        PR = k - 1;
-                    } else if(PR_stack_size > 0){ //grab from stack if possible
-                        PR_stack_size--;
-                        PR = PR_stack[PR_stack_size];
-                        PRtoNU[PR] = def->NU;
-                    } else if(PR_queue_start != PR_queue_end){ //grab from queue if possible
-                        PR = *PR_queue_start;
-                        PR_queue_start += 1;
+                    updateMaps = 0;
+                    PR = k - 1;
+                } else if(PR_stack_size > 0){ //grab from stack if possible
+                    PR_stack_size--;
+                    PR = PR_stack[PR_stack_size];
+                    PRtoNU[PR] = def->NU;
+                } else if(PR_queue_start != PR_queue_end){ //grab from queue if possible
+                    PR = *PR_queue_start;
+                    PR_queue_start += 1;
 
-                        //maintain mod of queue
-                        if(PR_queue_start >= PR_queue + k){ //make sure this math and check is correct
-                            PR_queue_start = PR_queue;
-                        } 
+                    //maintain queue bounds
+                    if(PR_queue_start >= PR_queue + k){ //make sure this math and check is correct
+                        PR_queue_start = PR_queue;
+                    } 
 
-                        //remove old value
-                        uint32_t VR_old = PRtoVR[PR];
-                        VRtoPR[VR_old] = 65;
-                        PRtoNU[PR] = def->NU;
-                    } else { //spill
-                        uint8_t maxPR = 0;
-                        uint32_t maxNU = 0;
-                        for(int i = 0; i < k - 1; i++){
-                            if(PRtoNU[i] > maxNU){
-                                maxPR = i;
-                                maxNU = PRtoNU[i];
-                            }
-                        }
-                        PR = maxPR; //pick PR to spill (PR with max PRtoNU) //will be more complex in the future
-                        
+                    //remove old value
+                    uint32_t VR_old = PRtoVR[PR];
+                    VRtoPR[VR_old] = 65;
+                    PRtoNU[PR] = def->NU;
+                } else { //spill
+                        //pick PR to spill (PR with max PRtoNU) //will be more complex in the future
                         //insert the loadI and store //WILL CHANGE LATER DO THIS FOR NOW
                         //                           //can delay inserting loadI and store if rematable rn
                         //                           //must store location of spill to be able to spill here if not rematable later
                         //                           //struct IR* VRtoSpillInsert, where loadI and store inserted as VRto...[VR]->next
                         //                           //on spill insertion, set VRto...[VR] to NULL
+                        uint8_t maxPR = 0;
+                        uint32_t maxNU = 0;
 
-                        //create loadI
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = spill_loc;
-                        (&(newLoadI->arg3))->PR = k - 1;
+                        uint32_t minNU = UINT32_MAX;
+                        uint8_t minPR = 65;
+                        for(int i = 0; i < k - 1; i++){
+                            if(PRtoNU[i] > maxNU){
+                                maxPR = i;
+                                maxNU = PRtoNU[i];
+                            }
 
-                        //create store
-                        struct IR* newStore = malloc(sizeof(struct IR));
-                        newStore->opcode = store;
-                        (&(newStore->arg1))->PR = PR;
-                        (&(newStore->arg3))->PR = k - 1;
+                            if(PRtoNU[i] < minNU && isRematable(PRtoVR[i], VRtoPR)){
+                                minNU = PRtoNU[i];
+                                minPR = i;
+                            }
+                        }
+                        PR = maxPR; 
 
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newStore;
-                        newLoadI->next = newStore;
-                        newLoadI->prev = prev;
-                        newStore->next = node;
-                        newStore->prev = newLoadI;
-
-
-                        //remove old values
                         uint32_t VR_old = PRtoVR[PR];
-                        VRtoSpill[VR_old] = spill_loc;
-                        spill_loc += 4;
+                        ///spill insertion
+                        //check if rematerializable
+                        if(minPR != 65){
+                            //add prev to VRtoRemat
+                            VRtoRemat[VR_old] = node->prev;
+                            VRtoOldPR[VR_old] = PR;
+                            //printf("check me out! im rematable!\n");
+                        } else {
+                            //do current spill
 
-                        VRNeedsRestore[VR_old] = 1;
+                                                    //create loadI
+                            struct IR* newLoadI= malloc(sizeof(struct IR));
+                            newLoadI->opcode = loadI;
+                            (&(newLoadI->arg1))->PR = spill_loc;
+                            (&(newLoadI->arg3))->PR = k - 1;
+
+                            //create store
+                            struct IR* newStore = malloc(sizeof(struct IR));
+                            newStore->opcode = store;
+                            (&(newStore->arg1))->PR = PR;
+                            (&(newStore->arg3))->PR = k - 1;
+
+                            //insert into ILOC
+                            struct IR* prev = node->prev;
+                            prev->next = newLoadI;
+                            node->prev = newStore;
+                            newLoadI->next = newStore;
+                            newLoadI->prev = prev;
+                            newStore->next = node;
+                            newStore->prev = newLoadI;
+
+
+                            //set spill location
+                            VRtoSpill[VR_old] = spill_loc;
+                            spill_loc += 4;
+                        }
+
+
+
+                        //printf("owo the future is now old man %i, PR: %i\n", VR_old, PR);
+                        //remove old values
                         VRtoPR[VR_old] = 65;
+                        
                         PRtoNU[PR] = def->NU;
-                    }
+                        
+                }
             } else { //nonspillable getPR
                 PR_stack_size--;
                 PR = PR_stack[PR_stack_size];
             }
 
-            if(save){
+            //printf("update pls\n");
+            //update maps if reserve register wasnt used
+            if(updateMaps){
                 //write VR and PR maps
                 VRtoPR[VR] = PR;
                 PRtoVR[PR] = VR;
             }
 
-            //check if restore needed
-            if(maxlive > k && VRNeedsRestore[VR]){
-                //reset restore
-                VRNeedsRestore[VR] = 0;
-                
-                //create loadI
-                        struct IR* newLoadI= malloc(sizeof(struct IR));
-                        newLoadI->opcode = loadI;
-                        (&(newLoadI->arg1))->PR = VRtoSpill[VR];
-                        (&(newLoadI->arg3))->PR = k - 1;
-
-                        //create store
-                        struct IR* newLoad = malloc(sizeof(struct IR));
-                        newLoad->opcode = load;
-                        (&(newLoad->arg1))->PR = k - 1;
-                        (&(newLoad->arg3))->PR = PR;
-
-                        //insert into ILOC
-                        struct IR* prev = node->prev;
-                        prev->next = newLoadI;
-                        node->prev = newLoad;
-                        newLoadI->next = newLoad;
-                        newLoadI->prev = prev;
-                        newLoad->next = node;
-                        newLoad->prev = newLoadI;
-            }
-
+            //printf("set PR\n");
+            //sets PR
             def->PR = PR;
         }
 
-
-
+        //printf("next uwu?\n");
+        //next operation
         node = node->next;
-
-        // //check maps
-        // for(int i = 0; i < maxVR; i++){
-        //     PR = VRtoPR[i];
-        //     if(PR != 65){
-        //         VR = PRtoVR[PR];
-        //         if(VR != i){
-        //             printf("YELL %i\n", i);
-        //         }
-        //     }
-        //     int rest = VRNeedsRestore[i];
-        //     if(rest){
-        //         printf("Needs restoration: %i\n", i);
-        //     }
-
-        //     int spill = VRtoSpill[i];
-        //     if(spill){
-        //         printf("%i spilled at %i\n", i, spill);
-        //     }
-        // }
+        index++;
     }
-    
-
 }
-
-
-
-        //PR = VRtoPR
-        //if PR == 65
-        //  if(maxlive > k)
-        //      spillable getPR
-        //      restore if VRtoSpill != 0
-        //      if PR = k-1 do not PR to VR and VR to PR
-        //  else
-        //      nonspillable getPR
-        //  PR = x
-        //  VRtoPR = PR
-        //  PRtoVR = u.VR
-        //u.PR = PR
-
-        //if u.isLU
-        //  if(maxlive > k)
-        //      spillable freePR/removePR
-        //  else
-        //      nonspillable freePR
-
-        //get defs
-        //if(maxlive > k)
-        //  spillable getPR
-        //else
-        //  nonspillable getPR
-        //PR = x
-        //VRtoPR = PR
-        //PRtoVR = d.VR
-        //d.PR = PR
-
-
-
-
-
-
-        //////spillable getPR
-        //if unused def return k-1 //check using arg.NU
-        //if undefed insert loadI 0 k-1 (once per operation) return k-1 //check using VRtoDef
-        //if PR_stack_size > 0 //stuff in PR stack
-        //  PR_stack_size--
-        //  PR = PR_stack[PR_stack_size]
-        //  PRtoNU[PR] = arg.NU
-        //  return PR
-        //
-        //if PR_queue_start != PR_queue_end //stuff in removal queue
-        //  PR = PR_queue_start
-        //  PR_queue_start += 1
-        //  if PR_queue_start >= PR_queue + k //make sure this math and check is correct //maintains queue in malloced space
-        //      PR_queue_start = PR_queue
-        //  VR_old = PRtoVR[PR]
-        //  VRtoPR[VR_old] = 65
-        //  PRtoNU[PR] = arg.NU
-        //  return PR
-        //  
-        ////must need a spill
-        //PR_spill = pick PR to spill (PR with max PRtoNU) //will be more complex in the future
-        //VRtoSpill = spill_loc
-        //spill_loc += 4
-        //insert the loadI and store //WILL CHANGE LATER DO THIS FOR NOW
-        //                           //can delay inserting loadI and store if rematable rn
-        //                           //must store location of spill to be able to spill here if not rematable later
-        //                           //struct IR* VRtoSpillInsert, where loadI and store inserted as VRto...[VR]->next
-        //                           //on spill insertion, set VRto...[VR] to NULL
-        //VR_old = PRtoVR[PR]
-        //VRtoPR[VR_old] = 65
-        //PRtoNU[PR] = arg.NU
-
-
-        //restore
-        //insert the loadI and load //WILL CHANGE LATER DO THIS FOR NOW
-        //                          //check if rematable rn
-        //                          //remat if yes
-        //                          //insert spill at VRto...[VR]->next if no
-        //                          //set VRto...[VR] to NULL
-
-
-        //////spillable freePR
-        //*PR_queue_end = PR
-        //PR_queue_end++
-        //if PR_queue_end >= PR_queue + k //check for correctness
-        //  PR_queue_end = PR_queue
-        
-
-
-        //////nonspillable getPR
-        //PR_stack_size--
-        //PR = PR_stack[PR_stack_size]
-
-
-        //////nonspillable freePR
-        //PR_stack[PR_stack_size] = PR
-        //stack_size++
-        //PRtoVR[PR] = UINT32_MAX
-        //VRtoPR = 65
