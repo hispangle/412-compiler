@@ -5,6 +5,7 @@
 
 extern struct IR* head;
 struct IR** VRtoDef;
+uint8_t* isVRStoreUse2;
 
 //conducts the renaming
 //returns 0 on success
@@ -396,25 +397,37 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
     return 0;
 }
 
-uint8_t isRematable(uint8_t VR, uint8_t* VRtoPR){
+uint8_t isRematable(uint32_t VR, uint8_t* VRtoPR){
     struct IR* node = VRtoDef[VR];
+
+    //NULL check
+    if(node == NULL){
+        return 0;
+    }
 
 
     //declare vars used for while
     struct argument* use1 = NULL;
     struct argument* use2 = NULL;
-    struct argument* def = NULL;
 
         //grab the use and def args where applicable 
     switch(node->opcode){
             case load:
                 use1 = &(node->arg1);
+                //return 0; //UNDER INVESTIGATION
+                //NONTRIVIAL CLEAN/DIRTY DISTINGUISHMENT
+                //perhaps mark if VR is a use2 in a store op
+                if(isVRStoreUse2[use1->VR]){
+                    return 0;
+                }
                 break;
             case store:
                 use1 = &(node->arg1);
                 use2 = &(node->arg3);
                 break;
             case loadI:
+                //always rematable
+                return 1;
                 break;
             case add:
             case sub:
@@ -530,7 +543,6 @@ int allocate(int k, int32_t n_ops){
     uint32_t spill_loc = 32768;
 
     struct IR** VRtoRemat;
-    uint32_t* VRtoOldVR;
     uint8_t* VRtoOldPR;
 
     uint32_t* PRtoNU;
@@ -550,7 +562,7 @@ int allocate(int k, int32_t n_ops){
         VRtoSpill = malloc(sizeof(uint32_t) * maxVR);
         VRtoRemat = malloc(sizeof(struct IR*) * maxVR);
         VRtoOldPR = malloc(sizeof(uint8_t) * maxVR);
-        VRtoOldVR = malloc(sizeof(uint32_t) * maxVR);
+        isVRStoreUse2 = malloc(sizeof(uint8_t) * maxVR);
         PRtoNU = malloc(sizeof(uint32_t) * k);
         PR_queue = malloc(sizeof(uint8_t) * k);
 
@@ -559,7 +571,7 @@ int allocate(int k, int32_t n_ops){
         PR_queue_end = PR_queue;
 
         //null checks
-        if(VRtoSpill == NULL || PRtoNU == NULL || PR_queue == NULL){
+        if(VRtoSpill == NULL || VRtoRemat == NULL || VRtoOldPR == NULL || isVRStoreUse2 == NULL || PRtoNU == NULL || PR_queue == NULL){
             return -1;
         }
 
@@ -1022,7 +1034,12 @@ int allocate(int k, int32_t n_ops){
                         //rematerialize
                         struct IR* newDef = malloc(sizeof(struct IR));
                         copy(newDef, VRtoDef[VR], VRtoPR);
-                        //printf("VR1: %i, PR: %i", newDef->arg1.VR, newDef->arg1.PR);
+                        // printf("VR1: %i, PR: %i\n", newDef->arg1.VR, newDef->arg1.PR);
+                        // printf("VR2: %i, PR: %i\n", newDef->arg2.VR, newDef->arg2.PR);
+                        // printf("OLD\n");
+                        // printf("VR1: %i, PR: %i\n", VRtoDef[VR]->arg1.VR, VRtoDef[VR]->arg1.PR);
+                        // printf("VR2: %i, PR: %i, VRtoPR: %i, PRtoVR: %i\n", VRtoDef[VR]->arg2.VR, VRtoDef[VR]->arg2.PR, VRtoPR[VRtoDef[VR]->arg2.VR], PRtoVR[2]);
+                        // printf("isRematable: %i\n", isRematable(VR, VRtoPR));
 
                         //insert before node
                         node->prev->next = newDef;
@@ -1115,7 +1132,16 @@ int allocate(int k, int32_t n_ops){
                 
             }
 
+
+            //save that VR was a Store use 2
+            if(maxlive > k && node->opcode == store){
+                isVRStoreUse2[VR] = 1;
+            }
+
             //sets PR
+            // if(PR == 65){
+            //     printf("OH NO\n");
+            // }
             use2->PR = PR;
         }
 
