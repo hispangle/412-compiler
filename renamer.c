@@ -11,6 +11,7 @@ struct IR** VRtoDef;
 
 
 uint8_t* isVRStoreUse2;
+uint8_t* VRHasUse;
 int updateMaps;
 
     //declares maps used in maxlive > k cases
@@ -422,6 +423,9 @@ int rename_registers(int32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
     }
 
 
+    //realloc
+    VRtoDef = realloc(VRtoDef, sizeof(struct IR*) * VRName);
+
     //pass values
     *maxVR = VRName;
     *maxlive_ptr = maxlive;
@@ -458,7 +462,7 @@ uint8_t isRematable(uint32_t VR, uint8_t* VRtoPR){
                 break;
             case loadI:
                 //always rematable
-                return 1;
+                return 2;
                 break;
             case add:
             case sub:
@@ -490,53 +494,41 @@ uint8_t isRematable(uint32_t VR, uint8_t* VRtoPR){
     return 1;
 }
 
-
-void rematerialize(struct IR* prev, uint32_t VR){
-    struct IR* oldDef = VRtoDef[VR];
-    struct IR* newDef = malloc(sizeof(struct IR));
-
+//copies opcode and VR only, inserts correct PR
+void copy(struct IR* new, struct IR* old, uint8_t* VRtoPR){
     //copy opcode
-    newDef->opcode = oldDef->opcode;
+    new->opcode = old->opcode;
 
     //copy VR
-    newDef->arg1.VR = oldDef->arg1.VR;
-    newDef->arg2.VR = oldDef->arg2.VR;
-    newDef->arg3.VR = oldDef->arg3.VR;
+    new->arg1.VR = old->arg1.VR;
+    new->arg2.VR = old->arg2.VR;
+    new->arg3.VR = old->arg3.VR;
 
     //get PR based on opcode
-    switch(newDef->opcode){
+    switch(new->opcode){
         case loadI: 
-            newDef->arg3.PR = VRtoPR[oldDef->arg3.VR];
+            new->arg3.PR = VRtoPR[old->arg3.VR];
         case output:
             //propagate constant
-            newDef->arg1.PR = oldDef->arg1.VR;
+            new->arg1.PR = old->arg1.VR;
             break;
         case add:
         case sub:
         case mult:
         case rshift:
         case lshift:
-            newDef->arg2.PR = VRtoPR[oldDef->arg2.VR];
+            new->arg2.PR = VRtoPR[old->arg2.VR];
+            //printf("new arg2 PR: %i\n", new->arg2.PR);
         case load:
         case store:
-            newDef->arg1.PR = VRtoPR[oldDef->arg1.VR];
-            newDef->arg3.PR = VRtoPR[oldDef->arg3.VR];
+            new->arg1.PR = VRtoPR[old->arg1.VR];
+            //printf("new arg1 PR: %i\n", new->arg1.PR);
+            new->arg3.PR = VRtoPR[old->arg3.VR];
+            //printf("new arg3 PR: %i\n", new->arg3.PR);
         default:
             break;
     }
-
-    //insert before node
-    struct IR* next = prev->next;
-    next->prev->next = newDef;
-    newDef->prev = next->prev;
-    newDef->next = next;
-    next->prev = newDef;
-                        
-    //remove the spill location
-    VRtoRemat[VR] = NULL;
 }
-
-
 
 void spill(struct IR* prev, uint8_t PR, uint32_t VR, uint8_t k){
     //create loadI
@@ -634,41 +626,89 @@ uint8_t get_a_PR(struct IR* node, struct argument* arg, uint32_t maxlive, uint8_
             PRtoNU[PR] = arg->NU;
         } else { //spill
             //values needed to PR selection
-            uint8_t maxPR = 0;
-            uint32_t maxNU = 0;
+            uint8_t maxDirtyPR = 65;
+            uint32_t maxDirtyNU = 0;
 
-            uint32_t minNU = UINT32_MAX;
-            uint8_t minPR = 65;
+            uint8_t minRematPR = 65;
+            uint32_t minRematNU = UINT32_MAX;
+
+            uint8_t maxCleanPR = 65;
+            uint32_t maxCleanNU = 0;
+
+            uint8_t maxLoadIPR = 65;
+            uint32_t maxLoadINU = 0;
 
             //choose which PR to spill
             for(int i = 0; i < k - 1; i++){
-                if(PRtoNU[i] > maxNU && i != markedPR){
-                    maxPR = i;
-                    maxNU = PRtoNU[i];
+                //ignore markedPR
+                if(i == markedPR){
+                    continue;
                 }
 
-                if(PRtoNU[i] < minNU && i != markedPR && isRematable(PRtoVR[i], VRtoPR)){
-                    minNU = PRtoNU[i];
-                    minPR = i;
+                //get farthest spill
+                if(PRtoNU[i] > maxDirtyNU && VRtoSpill[PRtoVR[i]] == 0){
+                    maxDirtyPR = i;
+                    maxDirtyNU = PRtoNU[i];
+                }
+
+                //get farthest clean spill
+                if(PRtoNU[i] > maxCleanNU && VRtoSpill[PRtoVR[i]] != 0){
+                    maxCleanPR = i;
+                    maxCleanNU = PRtoNU[i];
+                }
+
+                //get farthest loadI
+                if(PRtoNU[i] > maxLoadINU && isRematable(PRtoVR[i], VRtoPR) == 2){
+                    maxLoadIPR = i;
+                    maxLoadINU = PRtoNU[i];
+                }
+
+                // //get farthest remat
+                // if(PRtoNU[i] > maxRematNU && isRematable(PRtoVR[i], VRtoPR)){
+                //     maxRematPR = i;
+                //     maxRematNU = PRtoNU[i];
+                // }
+
+
+                //get closest remat
+                if(PRtoNU[i] < minRematNU && isRematable(PRtoVR[i], VRtoPR)){
+                    minRematNU = PRtoNU[i];
+                    minRematPR = i;
                 }
             }
 
             //spill furthest PR or closest rematerializable PR
-            PR = maxPR;
-            if(minPR != 65){
-                PR = minPR;
-            } 
+            PR = maxDirtyPR == 65 ? maxCleanPR : maxDirtyPR;
+            // if(minRematPR != 65){
+            //     PR = minRematPR;
+            // } 
+
+            //get clean PR if more than 75% dirty PR
+            if(maxDirtyNU - arg->NU < 4 / 3 * (maxCleanNU - arg->NU) && maxCleanPR != 65){
+                PR = maxCleanPR;
+            }
+
+            //get remat if remat < 50% dirty PR
+            if(maxDirtyNU - arg->NU > 2 * (minRematNU - arg->NU) && minRematPR != 65){
+                PR = minRematPR;
+            }
+
+            //get loadI if loadI > 50% dirty PR
+            if(maxDirtyNU - arg->NU < 2 * (maxLoadINU - arg->NU) && maxLoadIPR != 65){
+                PR = maxLoadIPR;
+            }
 
             //get VR that is currently sitting in the PR (due to laziness of queue)
             uint32_t VR_old = PRtoVR[PR];
 
             ///spill insertion
             //check if rematerializable
-            if(minPR != 65){
+            if(minRematPR != 65){
                 //save spill location in case remateralization does not work later
                 VRtoRemat[VR_old] = node->prev;
                 VRtoOldPR[VR_old] = PR;
             } else if(VRtoSpill[VR_old] == 0){ //check if value was already spilled
+                //dirty spill
                 spill(node->prev, PR, VR_old, k);
             }
 
@@ -713,8 +753,10 @@ int allocate(int k, int32_t n_ops){
         //make VR to PR
         VRtoPR = malloc(sizeof(uint8_t) * maxVR);
 
+        VRHasUse = malloc(sizeof(uint8_t) * maxVR);
+
         //null checks
-        if(PR_stack == NULL || PRtoVR == NULL || VRtoPR == NULL){
+        if(PR_stack == NULL || PRtoVR == NULL || VRtoPR == NULL || VRHasUse == NULL){
             return -1;
         }
 
@@ -848,7 +890,23 @@ int allocate(int k, int32_t n_ops){
                 if(VRtoRemat[VR] != NULL){
                     if(isRematable(VR, VRtoPR)){
                         //rematerialize
-                        rematerialize(node->prev, VR);
+                        struct IR* newDef = malloc(sizeof(struct IR));
+                        copy(newDef, VRtoDef[VR], VRtoPR);
+
+                        //insert before node
+                        node->prev->next = newDef;
+                        newDef->prev = node->prev;
+                        newDef->next = node;
+                        node->prev = newDef;
+                        
+                        //remove the spill location
+                        VRtoRemat[VR] = NULL;
+
+                        //remove original if possible
+                        if(newDef->opcode == loadI && !VRHasUse[VR]){
+                            VRtoDef[VR]->next->prev = VRtoDef[VR]->prev;
+                            VRtoDef[VR]->prev->next = VRtoDef[VR]->next;
+                        }
                     } else { //must insert the spill
                         spill(VRtoRemat[VR], VRtoOldPR[VR], VR, k);
                         restore(node->prev, PR, VR, k, index);
@@ -857,6 +915,9 @@ int allocate(int k, int32_t n_ops){
                     restore(node->prev, PR, VR, k, index);
                 }
             }
+
+            //indicate use
+            VRHasUse[VR] = 1;
 
             //sets PR where needed
             use1->PR = PR;
@@ -895,7 +956,18 @@ int allocate(int k, int32_t n_ops){
                 if(VRtoRemat[VR] != NULL){
                     if(isRematable(VR, VRtoPR)){
                         //rematerialize
-                        rematerialize(node->prev, VR);
+                        //rematerialize
+                        struct IR* newDef = malloc(sizeof(struct IR));
+                        copy(newDef, VRtoDef[VR], VRtoPR);
+
+                        //insert before node
+                        node->prev->next = newDef;
+                        newDef->prev = node->prev;
+                        newDef->next = node;
+                        node->prev = newDef;
+                        
+                        //remove the spill location
+                        VRtoRemat[VR] = NULL;
                     } else { //must insert the spill
                         spill(VRtoRemat[VR], VRtoOldPR[VR], VR, k);
                         restore(node->prev, PR, VR, k, index);
@@ -905,9 +977,18 @@ int allocate(int k, int32_t n_ops){
                 }
             }
 
+            //save that VR was a Store use 2 for rematerialization purposes
+            if(maxlive > k && node->opcode == store){
+                isVRStoreUse2[VR] = 1;
+            }
+
+            //indicate use
+            VRHasUse[VR] = 1;
+
             //sets PR
             use2->PR = PR;
         }
+
 
         ///free PR if last use
         //free use1
@@ -938,19 +1019,14 @@ int allocate(int k, int32_t n_ops){
 
         //free use2
         if(use2 != NULL){
-            //reobtain VR and PR
-            VR = use2->VR;
-            PR = use2->PR;
-
-            //free algorithm based on maxlive and k
+            //check for last use
             if(use2->isLU){
+                //reobtain VR and PR
+                VR = use2->VR;
+                PR = use2->PR;
+                
+                //free algorithm based on maxlive and k
                 if(maxlive > k){ //spillable free
-                    // //immediately place in stack again
-                    // PR_stack[PR_stack_size] = PR;
-                    // PR_stack_size++;
-                    // PRtoVR[PR] = UINT32_MAX;
-                    // VRtoPR[VR] = 65;
-
                     //place PR in queue but do not remove its contents
                     *PR_queue_end = PR;
                     PR_queue_end++;
