@@ -13,34 +13,29 @@
 //allocate space for IR at setup and in larger chunks after (exponential i think) (1k, 2k, 4k, 8k, etc)
 
 //externs
-extern struct token get_next_token();
-extern struct token get_next_eol_token();
-extern const char* TOKEN_NAMES[];
-
-//global token pointer but declared
-struct token* cur_tok;
+extern token get_next_token();
+extern token get_next_eol_token();
 
 //keep track of line number and op num
 uint32_t line_num = 1;
-int32_t op_num = 0;
+uint32_t op_num = 0;
 
 //flag for first error
 uint8_t err_found = 0;
 uint8_t new_err = 0;
 
 //keep track of head and last IR
-struct IR* head;
-struct IR* current;
+IR* current;
 
 //gets the next spot for IR
 //mallocs space if none left
 //for now is just malloc
-struct IR* get_next_IR_loc(){
-    return malloc(sizeof(struct IR));
+IR* get_next_IR_loc(){
+    return malloc(sizeof(IR));
 }
 
 //adds IR to linked list
-void add_IR(struct IR* ir){
+void add_IR(IR* ir){
     ir->prev = current;
     current->next = ir;
     current = ir;
@@ -99,11 +94,11 @@ void print_eol_error(){
 //creates the internal representation
 //returns num operations
 //or -1 on error
-int32_t parse(){
+int32_t parse(IR* head, token* cur_tok, uint32_t* n_ops){
     //get first token
     *cur_tok = get_next_token();
-    struct IR* ir;
-    
+    IR* ir;
+
     //normal loop
     while(cur_tok->type != EoF){
         switch(cur_tok->type){
@@ -489,28 +484,12 @@ int32_t parse(){
     current->next = head;
 
     //return -1 on error otherwise num ops
-    return err_found ? -1 : op_num;
+    *n_ops = op_num;
+    return err_found ? -1 : 0;
 }
 
-
-//sets up parser
-int setup_parser(struct token* tok_pointer){
-    cur_tok = tok_pointer;
-
-    //create empty head
-    struct IR* ir = malloc(sizeof(struct IR));
-
-    //check null
-    if(ir == NULL){
-        return -1;
-    }
-
-    ir->next = ir;
-    ir->prev = ir;
-
-    //assign head and current
-    head = ir;
-    current = ir;
-
-    return 0;
+void setup_parser(IR* head){
+    head->next = head;
+    head->prev = head;
+    current = head;
 }

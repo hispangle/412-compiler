@@ -7,9 +7,6 @@
 //have flag if eol already inserted before eof
 uint8_t eol_inserted = 0;
 
-//global token pointer
-//struct token* cur_tok;
-
 //global current class and char
 static uint8_t class;
 static char cur_char;
@@ -75,10 +72,10 @@ void get_next_line(){
 //useful for long lines
 //maybe insert eol befor eof
 //lightly tested
-struct token get_next_eol_token(){
+token get_next_eol_token(){
     get_next_line();
     cur_char = get_next_char();
-    struct token tok = {EOL, eol};
+    token tok = {EOL, eol};
     return tok;
 }
 
@@ -87,7 +84,7 @@ struct token get_next_eol_token(){
 //gets the next token
 //ignores further characters in a line if there is an error
 //return nothing and change contents of cur_tok if inefficient
-struct token get_next_token(){
+token get_next_token(){
     uint8_t state = 1; //default is 1, 0 is error
     uint32_t num = 0;
 
@@ -218,7 +215,7 @@ struct token get_next_token(){
             name = spelling;
             get_next_line();
     }
-    struct token tok = {type, name};
+    token tok = {type, name};
     return tok;
 }
 

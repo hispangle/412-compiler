@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = 
 LDFLAGS =
-OBJFILES = scanner.o main.o parser.o renamer.o
+OBJFILES = scanner.o main.o parser.o renamer.o scheduler.o
 TARGET = 412alloc
 build: $(TARGET)
 $(TARGET): $(OBJFILES)

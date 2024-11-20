@@ -1,39 +1,41 @@
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
 #include <stdint.h>
-
 //constants or structs to be used in multiple files
 
-//MAKE MORE DESCRIPTIVE ERRORS
-
 //how tokens are structured
-struct token {
+typedef struct {
     uint8_t type; //anything in token_types, but declared as uint8_t for size
     uint32_t name; //anything in token_names (or constant of size below 2^31)
-};
+} token;
 
 //how arguments are stored
-struct argument {
+typedef struct {
     uint32_t SR;
     uint32_t VR;
     uint32_t PR;
     uint32_t NU;
     uint8_t isLU;
-};
+} argument;
+
+//typedef for compilation
+typedef struct _IR IR;
 
 //IR
-struct IR {
+struct _IR {
     //required fields
     uint8_t opcode;
-    struct argument arg1;
-    struct argument arg2;
-    struct argument arg3;
+    argument arg1;
+    argument arg2;
+    argument arg3;
 
     //linked list
-    struct IR* next;
-    struct IR* prev;
+    IR* next;
+    IR* prev;
 };
 
 
-
+extern const char* TOKEN_NAMES[];
 // //token type
 // //matches with TOKEN_NAMES
 // const char* TOKEN_TYPES[] = {
@@ -68,6 +70,8 @@ enum token_types{
     ERROR
 };
 
+
+extern const char* TOKEN_TYPES[];
 // //lexeme of tokens
 // //matches TOKEN_TYPES order
 // const char* TOKEN_NAMES[] = {
@@ -110,3 +114,5 @@ enum token_names{
     invalid_op,
     invalid_sentence
 };
+
+#endif
