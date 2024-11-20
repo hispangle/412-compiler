@@ -3,13 +3,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "constants.h"
+#include "scheduler.h"
 
 //externs
 extern int setup_scanner(char* filename);
 extern token get_next_token();
-extern void setup_parser(IR* head);
-extern int32_t parse(IR* head, token* cur_tok, uint32_t* n_ops);
+extern int32_t parse(IR** list, token* cur_tok, uint32_t* n_ops);
 extern int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxlive_ptr);
+extern NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
 
 //enums
 typedef enum {
@@ -113,6 +114,45 @@ void print_IR(IR* head, Type type){
     
 }
 
+void print_graph(NodeList* leaves){
+    NodeList* leaf = leaves->next;
+    while(leaf != NULL){
+        IR* op = leaf->node->op;
+        uint32_t val1 = op->arg1.VR;
+        uint32_t val2 = op->arg2.VR;
+        uint32_t val3 = op->arg3.VR;
+        switch(op->opcode){
+            case load:
+            case store:
+                printf("%s ", TOKEN_NAMES[op->opcode]);
+                printf("r%i => r%i", val1, val3);
+                break;
+            case loadI:
+                printf("%s ", TOKEN_NAMES[op->opcode]);
+                printf("%i => r%i", val1, val3);
+                break;
+            case add:
+            case sub:
+            case mult:
+            case lshift:
+            case rshift:
+                printf("%s ", TOKEN_NAMES[op->opcode]);
+                printf("r%i, r%i => r%i", val1, val2, val3);
+                break;
+            case output:
+                printf("%s ", TOKEN_NAMES[op->opcode]);
+                printf("%i", val1);
+                break;
+            case nop:
+            printf("nop");
+                break;
+            default:
+                ;
+        }
+        printf("\n");
+        leaf = leaf->next;
+    }
+}
 
 //function that displays help for commandline args
 void h(){
@@ -128,8 +168,8 @@ int schedule(char* filename){
     token* tok = malloc(sizeof(token));
     if(tok == NULL) return -1;
         
-    IR* head = malloc(sizeof(IR));
-    if(head == NULL) return -1;
+    IR** list = malloc(sizeof(IR*));
+    if(list == NULL) return -1;
 
     uint32_t* n_ops = malloc(sizeof(uint32_t));
     if(n_ops == NULL) return -1;
@@ -142,16 +182,24 @@ int schedule(char* filename){
 
     //setup
     if(setup_scanner(filename)) return -1;
-    setup_parser(head);
 
     //parse
-    if(parse(head, tok, n_ops)) return -1;
+    if(parse(list, tok, n_ops)) return -1;
+    IR* head = *list; //guaranteed to be non null
 
     //rename
     if(rename_registers(*n_ops, head, maxVR, maxlive)) return -1;
 
-    //schedule
+    //print IR
     print_IR(head, VR);
+
+    //build dependency
+    NodeList* leaves = build_dependency_graph(head, *maxVR);
+    if(leaves == NULL) return -1;
+
+    //print dependency  
+    printf("\n\n\n");
+    print_graph(leaves);
 }
 
 

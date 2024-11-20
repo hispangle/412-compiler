@@ -30,7 +30,7 @@ IR* current;
 //gets the next spot for IR
 //mallocs space if none left
 //for now is just malloc
-IR* get_next_IR_loc(){
+inline static IR* get_next_IR_loc(){
     return malloc(sizeof(IR));
 }
 
@@ -94,7 +94,17 @@ void print_eol_error(){
 //creates the internal representation
 //returns num operations
 //or -1 on error
-int32_t parse(IR* head, token* cur_tok, uint32_t* n_ops){
+int parse(IR** list, token* cur_tok, uint32_t* n_ops){
+    //create the head of the linked list
+    IR* head = malloc(sizeof(IR));
+    if(head == NULL) return -1;
+
+    //initialize head
+    *list = head;
+    head->next = head;
+    head->prev = head;
+    current = head;
+
     //get first token
     *cur_tok = get_next_token();
     IR* ir;
@@ -486,10 +496,4 @@ int32_t parse(IR* head, token* cur_tok, uint32_t* n_ops){
     //return -1 on error otherwise num ops
     *n_ops = op_num;
     return err_found ? -1 : 0;
-}
-
-void setup_parser(IR* head){
-    head->next = head;
-    head->prev = head;
-    current = head;
 }
