@@ -9,4 +9,4 @@ $(TARGET): $(OBJFILES)
 clean:
 	rm -f $(OBJFILES) $(TARGET) *~ agm6.tar core.*
 tar:
-	tar cvf agm6.tar scanner.c main.c renamer.c constants.h parser.c makefile README
+	tar cvf agm6.tar scanner.c main.c renamer.c constants.h scheduler.c scheduler.h parser.c makefile README
