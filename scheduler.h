@@ -53,7 +53,8 @@ struct _Node{
 };
 
 struct _NodeList{
-    Node* node;
     NodeList* next;
+    NodeList* prev;
+    Node* node;
 };
 #endif

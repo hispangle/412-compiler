@@ -276,6 +276,14 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     node->n_parents--;
                 }
 
+                //make child
+                child = malloc(sizeof(NodeList));
+                if(child == NULL) return NULL;
+                child->node = node;
+
+                last_output->last_child->next = child;
+                last_output->last_child = child;
+
 
                 // //check if leaf (only possible on undefed use)
                 // if(!node->n_parents){
