@@ -91,6 +91,11 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     if(VRtoDef == NULL) return NULL;
 
 
+    //create a VR to Const map
+    uint32_t** VRtoConst = malloc(sizeof(uint32_t*) * (maxVR + 1));
+    if(VRtoConst == NULL) return NULL;
+
+
     //keep track of op_num
     uint32_t op_num = 0;
 
@@ -119,6 +124,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
         Node* parent_2;
         Child* child;
 
+        uint32_t* mem;
+        NodeList* current_store;
+        NodeList* current_output;
+
         switch(op->opcode){
             case load:
                 //latency
@@ -132,6 +141,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //use dependencies
                 //use 1
                 parent_1 = VRtoDef[VR_1];
+                node->mem_loc = VRtoConst[VR_1];
                 node->def_1 = parent_1;
 
                 //add node to children of parent
@@ -160,8 +170,28 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 
 
                 //memory dependencies
-                node->last_store = last_store->node;
-                if(last_store->node == NULL){
+                //find last store that has same or unknown address
+                if(node->mem_loc != NULL){
+                    current_store = last_store;
+                    while(current_store->node != NULL){
+                        mem = current_store->node->mem_loc;
+
+                        //unknown or same address
+                        if(mem == NULL || *mem == *(node->mem_loc)){
+                            node->last_store = current_store->node;
+                            break;
+                        }
+
+                        current_store = current_store->prev;
+                    }
+                } else {
+                    node->last_store = last_store->node;
+                }
+                
+                
+
+                //make children
+                if(node->last_store == NULL){
                     node->n_parents--;
                 } else {
                     //make child
@@ -171,8 +201,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     child->edge = conflict;
 
                     //assign child
-                    last_store->node->last_child->next = child;
-                    last_store->node->last_child = child;
+                    node->last_store->last_child->next = child;
+                    node->last_store->last_child = child;
                 }
 
 
@@ -205,8 +235,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 node->latency = 6;
 
 
-                //expected number of parents
-                node->n_parents = 3 + n_loads + n_outputs;
+                //expected number of parents //must add n loads found later
+                node->n_parents = 4; //2 defs + store + output
 
 
                 //process def restrictions
@@ -235,6 +265,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
                 //use 2
                 parent_2 = VRtoDef[VR_3];
+                node->mem_loc = VRtoConst[VR_3];
                 node->def_2 = parent_2;
 
                 //add node to children of parent
@@ -258,10 +289,25 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
                 //memory dependencies
                 //find last store with same or unknown address
-                node->last_store = last_store->node;
+                if(node->mem_loc != NULL){
+                    current_store = last_store;
+                    while(current_store->node != NULL){
+                        mem = current_store->node->mem_loc;
+
+                        //unknown or same address
+                        if(mem == NULL || *mem == *(node->mem_loc)){
+                            node->last_store = current_store->node;
+                            break;
+                        }
+
+                        current_store = current_store->prev;
+                    }
+                } else {
+                    node->last_store = last_store->node;
+                }
 
                 //create edge if needed
-                if(last_store->node == NULL){
+                if(node->last_store == NULL){
                     node->n_parents--;
                 } else {
                     //make child
@@ -271,24 +317,33 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     child->edge = serial;
 
                     //assign child
-                    last_store->node->last_child->next = child;
-                    last_store->node->last_child = child;
+                    node->last_store->last_child->next = child;
+                    node->last_store->last_child = child;
                 }
 
-                //connect all loads with same or unknown memory address
-                node->all_loads = load_list;
-                node->n_loads = n_loads;
 
-                //add node to children list of all loads
+                //find all load nodes with the same or unknown memory address
+                NodeList* load_store = malloc(sizeof(NodeList));
+                if(load_store == NULL) return NULL;
+                NodeList* last_load_store = load_store;
+                uint32_t n_load_serial = 0;
+
                 NodeList* load_node = load_list->next;
-                for(int i = 0; i < n_loads; i++){
-                    //if a def dependency already exists, reduce the parent count and do not make another child
+                for(uint32_t i = 0; i < n_loads; i++){
+                    //if a def dependency already exists, do not make another child
                     if(load_node->node == parent_1 || load_node->node == parent_2){
-                        node->n_parents--;
                         load_node = load_node->next;
                         continue;
                     } 
 
+                    //if memory is different, continue
+                    mem = load_node->node->mem_loc;
+                    if(mem != NULL && node->mem_loc != NULL && *mem != *(node->mem_loc)){
+                        load_node == load_node->next;
+                        continue;
+                    }
+
+                    //make child
                     child = malloc(sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
@@ -297,16 +352,42 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     //update linked list
                     load_node->node->last_child->next = child;
                     load_node->node->last_child = child;
+
+                    //add to load_store
+                    last_load_store->next = load_node;
+                    last_load_store = load_node;
+
+                    //iterate
                     load_node = load_node->next;
+                    n_load_serial++;
                 }
 
-                //connect last output
+                //connect all loads with same or unknown memory address
+                node->all_loads = load_store;
+                node->n_loads = n_load_serial;
+                node->n_parents += n_load_serial;
 
-                //find last output that is same or unknown memory address
-                node->last_output = last_output->node;
 
-                //make the edge
-                if(last_output->node == NULL){
+                //find last output with same or unknown address
+                if(node->mem_loc != NULL){
+                    current_output = last_output;
+                    while(current_output->node != NULL){
+                        mem = current_output->node->mem_loc;
+
+                        //unknown or same address
+                        if(mem == NULL || *mem == *(node->mem_loc)){
+                            node->last_output = current_output->node;
+                            break;
+                        }
+
+                        current_output = current_output->prev;
+                    }
+                } else {
+                    node->last_output = last_output->node;
+                }
+
+                //create edge if needed
+                if(node->last_output == NULL){
                     node->n_parents--;
                 } else {
                     //make child
@@ -315,11 +396,11 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     child->node = node;
                     child->edge = serial;
 
-                    last_output->node->last_child->next = child;
-                    last_output->node->last_child = child;
+                    //assign child
+                    node->last_output->last_child->next = child;
+                    node->last_output->last_child = child;
                 }
 
-                
 
                 // //check if leaf (only possible on undefed use)
                 // if(!node->n_parents){
@@ -332,6 +413,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //     last_leaf->next = next_leaf;
                 //     last_leaf = next_leaf;
                 // }
+
 
                 //add to store_list
                 NodeList* next_store = malloc(sizeof(NodeList));
@@ -348,6 +430,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //always a leaf
                 //def
                 VRtoDef[VR_3] = node;
+                VRtoConst[VR_3] = &(op->arg1.VR);
 
                 //create leaf
                 NodeList* next_leaf = malloc(sizeof(NodeList));
@@ -376,6 +459,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //use 1
                 parent_1 = VRtoDef[VR_1];
                 node->def_1 = parent_1;
+                uint32_t* const_1 = VRtoConst[VR_1];
 
                 //add node to children of parent
                 // if(parent_1 != NULL){
@@ -399,6 +483,35 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //use 2
                 parent_2 = VRtoDef[VR_2];
                 node->def_2 = parent_2;
+                uint32_t* const_2 = VRtoConst[VR_2];
+
+
+                //if both uses are constants, propagate constant
+                if(const_1 != NULL && const_2 != NULL){
+                    uint32_t* val = malloc(sizeof(uint32_t));
+                    if(val == NULL) return NULL;
+
+                    switch(op->opcode){
+                        case add:
+                            *val = *const_1 + *const_2;
+                            break;
+                        case sub:
+                            *val = *const_1 - *const_2;
+                            break;
+                        case mult:
+                            *val = *const_1 * *const_2;
+                            break;
+                        case lshift:
+                            *val = *const_1 << *const_2;
+                            break;
+                        case rshift:
+                            *val = *const_1 >> *const_2;
+                            break;
+                    }
+
+                    VRtoConst[VR_3] = val;
+                }
+
 
                 //add node to children of parent
                 // if(parent_2 != NULL){
@@ -447,31 +560,45 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
                 //expected number of parents
-                node->n_parents = 2;
+                node->n_parents = 2; //output + store
 
 
-                //no uses
                 //no defs
+                node->mem_loc = &(op->arg1.VR);
 
 
                 //memory dependencies
+                //find last store with same or unknown address
+                if(node->mem_loc != NULL){
+                    current_store = last_store;
+                    while(current_store->node != NULL){
+                        mem = current_store->node->mem_loc;
 
-                //find last_store with same or unknown memory address
-                node->last_store = last_store->node;
+                        //unknown or same address
+                        if(mem == NULL || *mem == *(node->mem_loc)){
+                            node->last_store = current_store->node;
+                            break;
+                        }
 
-                //edge relations
-                if(last_store->node == NULL){
+                        current_store = current_store->prev;
+                    }
+                } else {
+                    node->last_store = last_store->node;
+                }
+
+                //create edge if needed
+                if(node->last_store == NULL){
                     node->n_parents--;
                 } else {
                     //make child
                     child = malloc(sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
-                    child->edge = conflict;
+                    child->edge = serial;
 
                     //assign child
-                    last_store->node->last_child->next = child;
-                    last_store->node->last_child = child;
+                    node->last_store->last_child->next = child;
+                    node->last_store->last_child = child;
                 }
 
 

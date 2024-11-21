@@ -71,5 +71,6 @@ struct _Child{
     Child* prev;
     Node* node;
     EdgeType edge;
+    uint32_t register_cause;
 };
 #endif

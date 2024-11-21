@@ -154,7 +154,7 @@ void print_graph_edges(NodeList* nodes){
         }
 
         //print edge with children
-        NodeList* child = (NodeList*) node->node->first_child->next;
+        Child* child = (Child*) node->node->first_child->next;
         while(child != NULL){
             printf("\t%i->%i;\n", node->node->num, child->node->num);
             child = child->next;
