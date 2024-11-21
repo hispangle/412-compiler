@@ -56,38 +56,45 @@ const char* TOKEN_NAMES[] = {
 };
 
 
-void print_IR(IR* head, Type type){
-    uint32_t val1;
-    uint32_t val2;
-    uint32_t val3;
-
-    IR* node = head->next;
-    while(node != head){
+/*
+ * Prints an individual line of ILOC code. Does not print new line afterwards.
+ * The type of value printed depends on type.
+ * Requires: IR* ir, the line to be printed. must be non null.
+ *           Type type, the type of register to print.
+ * Returns: nothing.
+*/
+void print_IR(IR* ir, Type type){
+    // get the right value to print
+        uint32_t val1;
+        uint32_t val2;
+        uint32_t val3;
         switch(type){
             case SR:
-                val1 = node->arg1.SR;
-                val2 = node->arg2.SR;
-                val3 = node->arg3.SR;
+                val1 = ir->arg1.SR;
+                val2 = ir->arg2.SR;
+                val3 = ir->arg3.SR;
                 break;
             case VR:
-                val1 = node->arg1.VR;
-                val2 = node->arg2.VR;
-                val3 = node->arg3.VR;
+                val1 = ir->arg1.VR;
+                val2 = ir->arg2.VR;
+                val3 = ir->arg3.VR;
                 break;
             case PR:
-                val1 = val1;
-                val2 = val2;
-                val3 = val3;
+                val1 = ir->arg1.PR;
+                val2 = ir->arg2.PR;
+                val3 = ir->arg3.PR;
                 break;
         }
-        switch(node->opcode){
+
+        // print based on opcode
+        switch(ir->opcode){
             case load:
             case store:
-                printf("%s ", TOKEN_NAMES[node->opcode]);
+                printf("%s ", TOKEN_NAMES[ir->opcode]);
                 printf("r%i => r%i", val1, val3);
                 break;
             case loadI:
-                printf("%s ", TOKEN_NAMES[node->opcode]);
+                printf("%s ", TOKEN_NAMES[ir->opcode]);
                 printf("%i => r%i", val1, val3);
                 break;
             case add:
@@ -95,11 +102,11 @@ void print_IR(IR* head, Type type){
             case mult:
             case lshift:
             case rshift:
-                printf("%s ", TOKEN_NAMES[node->opcode]);
+                printf("%s ", TOKEN_NAMES[ir->opcode]);
                 printf("r%i, r%i => r%i", val1, val2, val3);
                 break;
             case output:
-                printf("%s ", TOKEN_NAMES[node->opcode]);
+                printf("%s ", TOKEN_NAMES[ir->opcode]);
                 printf("%i", val1);
                 break;
             case nop:
@@ -108,53 +115,114 @@ void print_IR(IR* head, Type type){
             default:
                 ;
         }
+}
+
+/*
+ * Prints the sequence of ILOC commands given at head. The
+ * information printed depends on the type given. 
+ * Requires: IR* head, the head of the linked list of the IR representation. Must be non null.
+ *           Type type, the kind of register to be printed.
+ * Returns: Nothing.
+*/
+void print_IR_List(IR* head, Type type){
+    IR* node = head->next;
+    while(node != head){
+        print_IR(node, type);
         printf("\n");
         node = node->next;
-    }
-    
+    } 
 }
 
-void print_graph(NodeList* leaves){
-    NodeList* leaf = leaves->next;
-    while(leaf != NULL){
-        IR* op = leaf->node->op;
-        uint32_t val1 = op->arg1.VR;
-        uint32_t val2 = op->arg2.VR;
-        uint32_t val3 = op->arg3.VR;
-        switch(op->opcode){
-            case load:
-            case store:
-                printf("%s ", TOKEN_NAMES[op->opcode]);
-                printf("r%i => r%i", val1, val3);
-                break;
-            case loadI:
-                printf("%s ", TOKEN_NAMES[op->opcode]);
-                printf("%i => r%i", val1, val3);
-                break;
-            case add:
-            case sub:
-            case mult:
-            case lshift:
-            case rshift:
-                printf("%s ", TOKEN_NAMES[op->opcode]);
-                printf("r%i, r%i => r%i", val1, val2, val3);
-                break;
-            case output:
-                printf("%s ", TOKEN_NAMES[op->opcode]);
-                printf("%i", val1);
-                break;
-            case nop:
-            printf("nop");
-                break;
-            default:
-                ;
+/*
+ * Prints all the graph edges between nodes and their children.
+ * Then recursively prints edges from children and their children.
+ * Changes node->complete to false for each node.
+ * Requires: NodeList* nodes, the list of nodes whos edges to print. Must be non null.
+ * Returns: Nothing.
+*/
+void print_graph_edges(NodeList* nodes){
+    NodeList* node = nodes->next;
+
+    //print nodes
+    while(node != NULL){
+        IR* op = node->node->op;
+
+        //skip if node has been printed
+        if(!node->node->complete){
+            node = node->next;
+            continue;
         }
-        printf("\n");
-        leaf = leaf->next;
+
+        //print edge with children
+        NodeList* child = node->node->first_child->next;
+        while(child != NULL){
+            printf("\t%i->%i;\n", node->node->num, child->node->num);
+            child = child->next;
+        }
+
+        //update print completeness
+        node->node->complete = false;
+
+        //print children
+        print_graph_edges(node->node->first_child);
+
+        node = node->next;
     }
 }
 
-//function that displays help for commandline args
+/*
+ * Prints all the graph nodes in the list of nodes, in a format readable by graphviz.
+ * Also prints the children of each node recursively.
+ * Sets node->successful to true for each node printed.
+ * Requires: NodeList* nodes, a list of nodes to print. Must be non null.
+ * Returns: nothing.
+*/
+void print_graph_nodes(NodeList* nodes){
+    //cycle thru nodes in the list
+    NodeList* node = nodes->next;
+    while(node != NULL){
+        IR* op = node->node->op;
+
+        //skip if node has been printed
+        if(node->node->complete){
+            node = node->next;
+            continue;
+        }
+
+        //print node
+        printf("\t%i [label=\"%i: ", node->node->num, node->node->num);
+        print_IR(op, VR);
+        printf("\"];\n");
+
+        //indicate completeness of print
+        node->node->complete = true;
+
+        //print children
+        print_graph_nodes(node->node->first_child);
+
+        node = node->next;
+    }
+}
+
+/*
+ * Prints the dependency graph given by the leaves in dot format, readable by graphviz.
+ * Sets node->num for each node in the dependency graph.
+ * Requires: NodeList* leaves, the list of leaves of the dependency graph. Must be non null.
+ * Returns: nothing
+*/
+void print_graph(NodeList* leaves){
+    printf("digraph DG{\n");
+    print_graph_nodes(leaves);
+    print_graph_edges(leaves);
+    printf("}\n");
+}
+
+/*
+ * Prints out all functionality of this program in a useful manner.
+ * Requires: nothing.
+ * Returns: nothing.
+ * Program should terminate afterwards.
+*/
 void h(){
     printf("Help for 412alloc (412 Register Allocator):\n");
     printf("Command syntax:\n");
@@ -163,6 +231,16 @@ void h(){
     printf("\t-h: Displays this help text. Ignores any file given.\n");
 }
 
+
+
+/*
+ * Conducts the scheduling of an ILOC code.
+ * Requires: char* filename, the name of the file containing the ILOC program;
+ * If the file does not contain a valid ILOC program, then prints all errors found to stderr.
+ * If the file has a valid ILOC program, it schedules the program to work units.
+ * Returns: -1 on failure
+ *           0 on success
+*/
 int schedule(char* filename){
     //allocate
     token* tok = malloc(sizeof(token));
@@ -191,28 +269,29 @@ int schedule(char* filename){
     if(rename_registers(*n_ops, head, maxVR, maxlive)) return -1;
 
     //print IR
-    print_IR(head, VR);
+    // print_IR_List(head, VR);
 
     //build dependency
     NodeList* leaves = build_dependency_graph(head, *maxVR);
     if(leaves == NULL) return -1;
 
     //print dependency  
-    printf("\n\n\n");
     print_graph(leaves);
 }
 
 
-
-
-
-//TODO: clean up parse to not have an extern setup
-//TODO: clean up scan and parse code (mainly variables and global things)
-//TODO: determine if passing in head is better than global (ehhhhhhh)
+/*
+ *
+ *
+ * 
+ * 
+ * 
+ * 
+ * 
+*/
 int main(int argc, char* argv[]){
     //flags
     uint8_t h_flag = 0;
-    uint8_t schedule_flag = 0;
 
     //check arguments
     for(int i = 1; i < argc; i += 2){
@@ -220,24 +299,18 @@ int main(int argc, char* argv[]){
         if(word[0] == '-'){
             if(strchr(word, 'h')){
                 h_flag = i;
-                break;
             }
-        } else if(!strcmp(word, "schedule")){
-            schedule_flag = i;
-        }
-        else{
-            fprintf(stderr, "Bad arguments!\n");
-            h_flag = 1;
-            break;
-        }
+        } 
+        break;
     }
 
     //process flags
     int code = 0;
     if(h_flag){
         h();
-    } else if(schedule_flag && schedule_flag < argc - 1){
-        code = schedule(argv[schedule_flag + 1]);
+    } 
+    else if(argc > 0){
+        schedule(argv[1]);
     }
     else{
         fprintf(stderr, "ERROR: Bad Arguments!\n");

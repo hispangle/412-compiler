@@ -12,14 +12,17 @@ struct _Node{
     //original instruction
     IR* op;
 
-    //completed boolean (unsure if used)
+    //completed boolean (unsure if used). currently used for print
     bool complete;
+
+    //node number. used for print
+    uint32_t num;
 
     //latency of operation
     uint8_t latency;
 
-    //memory location used in a memop
-    //uint32_t* mem_loc;
+    // memory location used in a memop
+    uint32_t* mem_loc;
 
     //n_parents and n_ready for early release
     uint32_t n_parents;
