@@ -154,7 +154,7 @@ void print_graph_edges(NodeList* nodes){
         }
 
         //print edge with children
-        NodeList* child = node->node->first_child->next;
+        NodeList* child = (NodeList*) node->node->first_child->next;
         while(child != NULL){
             printf("\t%i->%i;\n", node->node->num, child->node->num);
             child = child->next;
@@ -164,7 +164,7 @@ void print_graph_edges(NodeList* nodes){
         node->node->complete = false;
 
         //print children
-        print_graph_edges(node->node->first_child);
+        print_graph_edges((NodeList*) (node->node->first_child));
 
         node = node->next;
     }
@@ -198,7 +198,7 @@ void print_graph_nodes(NodeList* nodes){
         node->node->complete = true;
 
         //print children
-        print_graph_nodes(node->node->first_child);
+        print_graph_nodes((NodeList*) (node->node->first_child));
 
         node = node->next;
     }

@@ -6,6 +6,7 @@
 //typing for compilation
 typedef struct _Node Node;
 typedef struct _NodeList NodeList;
+typedef struct _Child Child;
 
 //Node struct for dependency graph
 struct _Node{
@@ -36,25 +37,39 @@ struct _Node{
     //load and output conflict; store serialization
     Node* last_store;
 
-    //output serialization
+    //output and store serialization
     Node* last_output;
 
     //store serialization
     uint32_t n_loads;
     NodeList* all_loads;
 
-    //store serialization
-    uint32_t n_outputs;
-    NodeList* all_outputs;
-
     //children
-    NodeList* first_child; //dummy head
-    NodeList* last_child;
+    Child* first_child; //dummy head
+    Child* last_child;
 };
 
+
+//linked list of nodes
 struct _NodeList{
     NodeList* next;
     NodeList* prev;
     Node* node;
+};
+
+//types of edges
+typedef enum {
+    def,
+    serial,
+    conflict, 
+} EdgeType;
+
+//linked list of children
+//has an additional 'type' attribute to NodeList
+struct _Child{
+    Child* next;
+    Child* prev;
+    Node* node;
+    EdgeType edge;
 };
 #endif
