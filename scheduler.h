@@ -22,6 +22,9 @@ struct _Node{
     //latency of operation
     uint8_t latency;
 
+    //max remaining latency
+    uint32_t remaining_latency;
+
     // memory location used in a memop
     uint32_t* mem_loc;
 
@@ -45,6 +48,7 @@ struct _Node{
     NodeList* all_loads;
 
     //children
+    uint32_t n_children;
     Child* first_child; //dummy head
     Child* last_child;
 };

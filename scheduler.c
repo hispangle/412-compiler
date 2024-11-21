@@ -12,19 +12,16 @@
 */
 Node* new_node(uint32_t op_num){
     //malloc node
-    Node* node = malloc(sizeof(Node));
+    Node* node = calloc(1, sizeof(Node));
     if(node == NULL) return NULL;
     
     //malloc child
-    Child* child = malloc(sizeof(Child));
+    Child* child = calloc(1, sizeof(Child));
     if(child == NULL) return NULL;
     
     //set children
     node->first_child = child;
     node->last_child = child;
-
-    //set complete to false
-    node->complete = false;
 
     //give op_num
     node->num = op_num;
@@ -32,7 +29,6 @@ Node* new_node(uint32_t op_num){
     //return initialized node
     return node;
 }
-
 
 
 //builds a dependency graph of a given IR
@@ -43,7 +39,7 @@ Node* new_node(uint32_t op_num){
 //failure: returns NULL
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     //create the leaves list
-    NodeList* leaves = malloc(sizeof(NodeList)); //dummy head
+    NodeList* leaves = calloc(1, sizeof(NodeList)); //dummy head
     if(leaves == NULL) return NULL;
 
     //current end of list
@@ -51,11 +47,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
     //create the load list
-    NodeList* load_list = malloc(sizeof(NodeList)); //dummy head
+    NodeList* load_list = calloc(1, sizeof(NodeList)); //dummy head
     if(load_list == NULL) return NULL;
 
     //current last load
-    load_list->node = NULL; //make this explicit as a preventative measure against bugs
     NodeList* last_load = load_list;
 
     //keep track of n_loads
@@ -63,11 +58,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
     //create the output list
-    NodeList* output_list = malloc(sizeof(NodeList));
+    NodeList* output_list = calloc(1, sizeof(NodeList));
     if(output_list == NULL) return NULL;
 
     //current last output
-    output_list->node = NULL; //preventative bug squash
     NodeList* last_output = output_list;
 
     //keep track of n_outputs
@@ -75,30 +69,29 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
     //create the store list
-    NodeList* store_list = malloc(sizeof(NodeList));
+    NodeList* store_list = calloc(1, sizeof(NodeList));
     if(store_list == NULL) return NULL;
 
     //current last store
-    store_list->node = NULL; //preventative bug squash
     NodeList* last_store = store_list;
 
-    //keep track of n_outputs
+    //keep track of n_stores
     uint32_t n_stores = 0;
 
 
     //create a VR to DEF map
-    Node** VRtoDef = malloc(sizeof(Node*) * (maxVR + 1));
+    Node** VRtoDef = calloc((maxVR + 1), sizeof(Node*));
     if(VRtoDef == NULL) return NULL;
 
 
     //create a VR to Const map
-    uint32_t** VRtoConst = malloc(sizeof(uint32_t*) * (maxVR + 1));
+    uint32_t** VRtoConst = calloc((maxVR + 1), sizeof(uint32_t*));
     if(VRtoConst == NULL) return NULL;
 
 
     //keep track of op_num
     uint32_t op_num = 0;
-
+    
 
     //loop thru operations first to last
     IR* op = head->next;
@@ -123,7 +116,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
         Node* parent_1;
         Node* parent_2;
         Child* child;
-
         uint32_t* mem;
         NodeList* current_store;
         NodeList* current_output;
@@ -135,7 +127,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
                 //expected number of parents
-                node->n_parents = 2;
+                node->n_parents = 2; //def + store
 
 
                 //use dependencies
@@ -144,23 +136,17 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 node->mem_loc = VRtoConst[VR_1];
                 node->def_1 = parent_1;
 
-                //add node to children of parent
-                // if(parent_1 != NULL){
-                    //create child
-                    child = malloc(sizeof(Child));
-                    if(child == NULL) return NULL;
-                    child->node = node;
-                    child->edge = def;
+                //create child
+                child = calloc(1, sizeof(Child));
+                if(child == NULL) return NULL;
+                child->node = node;
+                child->edge = def;
+                child->register_cause = VR_1;
 
-                    //extend child list
-                    parent_1->last_child->next = child;
-                    parent_1->last_child = child;
-                // }
-
-                // //undefed use
-                // else {
-                //     node->n_parents--;
-                // }
+                //extend child list
+                parent_1->last_child->next = child;
+                parent_1->last_child = child;
+                parent_1->n_children++;
 
 
                 //def
@@ -173,7 +159,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //find last store that has same or unknown address
                 if(node->mem_loc != NULL){
                     current_store = last_store;
-                    while(current_store->node != NULL){
+                    while(current_store->prev != NULL){
                         mem = current_store->node->mem_loc;
 
                         //unknown or same address
@@ -187,15 +173,13 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 } else {
                     node->last_store = last_store->node;
                 }
-                
-                
 
                 //make children
                 if(node->last_store == NULL){
                     node->n_parents--;
                 } else {
                     //make child
-                    child = malloc(sizeof(Child));
+                    child = calloc(1, sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
                     child->edge = conflict;
@@ -203,24 +187,12 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     //assign child
                     node->last_store->last_child->next = child;
                     node->last_store->last_child = child;
+                    node->last_store->n_children++;
                 }
 
 
-                // //check if leaf (only possible on undefed use)
-                // if(!node->n_parents){
-                //     //create leaf
-                //     NodeList* next_leaf = malloc(sizeof(NodeList));
-                //     if(next_leaf == NULL) return NULL;
-                //     next_leaf->node = node;
-
-                //     //extend list
-                //     last_leaf->next = next_leaf;
-                //     last_leaf = next_leaf;
-                // }
-
-
                 //add to load_list
-                NodeList* next_load = malloc(sizeof(NodeList));
+                NodeList* next_load = calloc(1, sizeof(NodeList));
                 if(next_load == NULL) return NULL;
                 next_load->node = node;
 
@@ -244,23 +216,17 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 parent_1 = VRtoDef[VR_1];
                 node->def_1 = parent_1;
 
-                //add node to children of parent
-                // if(parent_1 != NULL){
-                    //create child
-                    child = malloc(sizeof(Child));
-                    if(child == NULL) return NULL;
-                    child->node = node;
-                    child->edge = def;
+                //create child
+                child = calloc(1, sizeof(Child));
+                if(child == NULL) return NULL;
+                child->node = node;
+                child->edge = def;
+                child->register_cause = VR_1;
 
-                    //extend child list
-                    parent_1->last_child->next = child;
-                    parent_1->last_child = child;
-                // }
-
-                // //undefed use
-                // else {
-                //     node->n_parents--;
-                // }
+                //extend child list
+                parent_1->last_child->next = child;
+                parent_1->last_child = child;
+                parent_1->n_children++;
 
 
                 //use 2
@@ -268,30 +234,24 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 node->mem_loc = VRtoConst[VR_3];
                 node->def_2 = parent_2;
 
-                //add node to children of parent
-                // if(parent_2 != NULL){
-                    //create child
-                    child = malloc(sizeof(Child));
-                    if(child == NULL) return NULL;
-                    child->node = node;
-                    child->edge = def;
+                //create child
+                child = calloc(1, sizeof(Child));
+                if(child == NULL) return NULL;
+                child->node = node;
+                child->edge = def;
+                child->register_cause = VR_3;
 
-                    //extend child list
-                    parent_2->last_child->next = child;
-                    parent_2->last_child = child;
-                // }
-
-                // //undefed use
-                // if(parent_2 == NULL){
-                //     node->n_parents--;
-                // }
+                //extend child list
+                parent_2->last_child->next = child;
+                parent_2->last_child = child;
+                parent_2->n_children++;
 
 
                 //memory dependencies
                 //find last store with same or unknown address
                 if(node->mem_loc != NULL){
                     current_store = last_store;
-                    while(current_store->node != NULL){
+                    while(current_store->prev != NULL){
                         mem = current_store->node->mem_loc;
 
                         //unknown or same address
@@ -311,7 +271,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     node->n_parents--;
                 } else {
                     //make child
-                    child = malloc(sizeof(Child));
+                    child = calloc(1, sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
                     child->edge = serial;
@@ -319,11 +279,12 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     //assign child
                     node->last_store->last_child->next = child;
                     node->last_store->last_child = child;
+                    node->last_store->n_children++;
                 }
 
 
                 //find all load nodes with the same or unknown memory address
-                NodeList* load_store = malloc(sizeof(NodeList));
+                NodeList* load_store = calloc(1, sizeof(NodeList));
                 if(load_store == NULL) return NULL;
                 NodeList* last_load_store = load_store;
                 uint32_t n_load_serial = 0;
@@ -344,7 +305,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     }
 
                     //make child
-                    child = malloc(sizeof(Child));
+                    child = calloc(1, sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
                     child->edge = serial;
@@ -352,14 +313,15 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     //update linked list
                     load_node->node->last_child->next = child;
                     load_node->node->last_child = child;
+                    load_node->node->n_children++;
 
                     //add to load_store
                     last_load_store->next = load_node;
                     last_load_store = load_node;
+                    n_load_serial++;
 
                     //iterate
                     load_node = load_node->next;
-                    n_load_serial++;
                 }
 
                 //connect all loads with same or unknown memory address
@@ -371,7 +333,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //find last output with same or unknown address
                 if(node->mem_loc != NULL){
                     current_output = last_output;
-                    while(current_output->node != NULL){
+                    while(current_output->prev != NULL){
                         mem = current_output->node->mem_loc;
 
                         //unknown or same address
@@ -391,7 +353,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     node->n_parents--;
                 } else {
                     //make child
-                    child = malloc(sizeof(Child));
+                    child = calloc(1, sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
                     child->edge = serial;
@@ -399,24 +361,12 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     //assign child
                     node->last_output->last_child->next = child;
                     node->last_output->last_child = child;
+                    node->last_output->n_children++;
                 }
 
 
-                // //check if leaf (only possible on undefed use)
-                // if(!node->n_parents){
-                //     //create leaf
-                //     NodeList* next_leaf = malloc(sizeof(NodeList));
-                //     if(next_leaf == NULL) return NULL;
-                //     next_leaf->node = node;
-
-                //     //extend list
-                //     last_leaf->next = next_leaf;
-                //     last_leaf = next_leaf;
-                // }
-
-
                 //add to store_list
-                NodeList* next_store = malloc(sizeof(NodeList));
+                NodeList* next_store = calloc(1, sizeof(NodeList));
                 if(next_store == NULL) return NULL;
                 next_store->node = node;
 
@@ -433,7 +383,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 VRtoConst[VR_3] = &(op->arg1.VR);
 
                 //create leaf
-                NodeList* next_leaf = malloc(sizeof(NodeList));
+                NodeList* next_leaf = calloc(1, sizeof(NodeList));
                 if(next_leaf == NULL) return NULL;
                 next_leaf->node = node;
 
@@ -452,7 +402,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
                 //expected number of parents
-                node->n_parents = 2;
+                node->n_parents = 2; //2 defs
 
 
                 //process def restrictions
@@ -462,28 +412,34 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 uint32_t* const_1 = VRtoConst[VR_1];
 
                 //add node to children of parent
-                // if(parent_1 != NULL){
-                    //create child
-                    child = malloc(sizeof(Child));
-                    if(child == NULL) return NULL;
-                    child->node = node;
-                    child->edge = def;
+                child = calloc(1, sizeof(Child));
+                if(child == NULL) return NULL;
+                child->node = node;
+                child->edge = def;
+                child->register_cause = VR_1;
 
-                    //extend child list
-                    parent_1->last_child->next = child;
-                    parent_1->last_child = child;
-                // }
-
-                // //undefed use
-                // else {
-                //     node->n_parents--;
-                // }
+                //extend child list
+                parent_1->last_child->next = child;
+                parent_1->last_child = child;
+                parent_1->n_children++;
 
 
                 //use 2
                 parent_2 = VRtoDef[VR_2];
                 node->def_2 = parent_2;
                 uint32_t* const_2 = VRtoConst[VR_2];
+
+                //add node to children of parent
+                child = calloc(1, sizeof(Child));
+                if(child == NULL) return NULL;
+                child->node = node;
+                child->edge = def;
+                child->register_cause = VR_2;
+
+                //extend child list
+                parent_2->last_child->next = child;
+                parent_2->last_child = child;
+                parent_2->n_children++;
 
 
                 //if both uses are constants, propagate constant
@@ -513,25 +469,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 }
 
 
-                //add node to children of parent
-                // if(parent_2 != NULL){
-                    //create child
-                    child = malloc(sizeof(Child));
-                    if(child == NULL) return NULL;
-                    child->node = node;
-                    child->edge = def;
-
-                    //extend child list
-                    parent_2->last_child->next = child;
-                    parent_2->last_child = child;
-                // }
-
-                // //undefed use
-                // if(parent_2 == NULL){
-                //     node->n_parents--;
-                // }
-
-
                 //def
                 //no dependencies
                 //assign to VRtoDef
@@ -539,19 +476,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
                 //no memory dependencies; 
-
-
-                // //check if leaf (only possible on undefed use)
-                // if(!node->n_parents){
-                //     //create leaf
-                //     NodeList* next_leaf = malloc(sizeof(NodeList));
-                //     if(next_leaf == NULL) return NULL;
-                //     next_leaf->node = node;
-
-                //     //extend list
-                //     last_leaf->next = next_leaf;
-                //     last_leaf = next_leaf;
-                // }
 
                 break;
             case output:
@@ -563,7 +487,11 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 node->n_parents = 2; //output + store
 
 
+                //no uses
                 //no defs
+
+
+                //memory location
                 node->mem_loc = &(op->arg1.VR);
 
 
@@ -571,7 +499,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //find last store with same or unknown address
                 if(node->mem_loc != NULL){
                     current_store = last_store;
-                    while(current_store->node != NULL){
+                    while(current_store->prev != NULL){
                         mem = current_store->node->mem_loc;
 
                         //unknown or same address
@@ -591,7 +519,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     node->n_parents--;
                 } else {
                     //make child
-                    child = malloc(sizeof(Child));
+                    child = calloc(1, sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
                     child->edge = serial;
@@ -599,6 +527,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     //assign child
                     node->last_store->last_child->next = child;
                     node->last_store->last_child = child;
+                    node->last_store->n_children++;
                 }
 
 
@@ -606,25 +535,26 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 node->last_output = last_output->node;
 
                 //deal with parents
-                if(last_output->node == NULL){
+                if(node->last_output == NULL){
                     node->n_parents--;
                 } else {
                     //make child
-                    child = malloc(sizeof(Child));
+                    child = calloc(1, sizeof(Child));
                     if(child == NULL) return NULL;
                     child->node = node;
                     child->edge = serial;
 
                     //assign child
-                    last_output->node->last_child->next = child;
-                    last_output->node->last_child = child;
+                    node->last_output->last_child->next = child;
+                    node->last_output->last_child = child;
+                    node->last_output->n_children++;
                 }
 
 
                 //check if leaf (only possible if no stores or outputs beforehand)
                 if(!node->n_parents){
                     //create leaf
-                    NodeList* next_leaf = malloc(sizeof(NodeList));
+                    NodeList* next_leaf = calloc(1, sizeof(NodeList));
                     if(next_leaf == NULL) return NULL;
                     next_leaf->node = node;
 
@@ -635,7 +565,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
 
                 //add to output_list
-                NodeList* next_output = malloc(sizeof(NodeList));
+                NodeList* next_output = calloc(1, sizeof(NodeList));
                 if(next_output == NULL) return NULL;
                 next_output->node = node;
 
@@ -653,5 +583,11 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
         op = op->next;
     }
 
+    //free at finish
+    free(VRtoConst);
+    free(VRtoDef);
+    free(load_list);
+    free(output_list);
+    free(store_list);
     return leaves;
 }

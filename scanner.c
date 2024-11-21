@@ -226,7 +226,7 @@ int setup_scanner(char* filename){
     //initialize CHAR_CLASS
     {
         //give space to array
-        CHAR_CLASS = malloc(sizeof(uint8_t) * 257);
+        CHAR_CLASS = calloc(257, sizeof(uint8_t));
 
         //deal with EOF
         CHAR_CLASS[0] = EoF;
@@ -456,4 +456,15 @@ int setup_scanner(char* filename){
     }
 
     return 0;
+}
+
+/*
+ * Finalizes everything from the scanner. Closes the file and frees CHAR_CLASS.
+ * Requires: nothing.
+ * Returns: nothing.
+*/
+void close_scanner(){
+    //free everything
+    fclose(file);
+    free(CHAR_CLASS - 1);
 }

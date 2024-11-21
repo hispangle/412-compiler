@@ -1,12 +1,6 @@
-autograder-lab-1/
-autograder-lab-2/
-autograder-lab-3/
-schedule
-main.o
+autograder*/
 .vscode/
 old_renamer.c
-parser.o
-renamer.o
-scanner.o
-scheduler.o
-test.txt
+*.o
+schedule
+test*

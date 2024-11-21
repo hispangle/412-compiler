@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 #include "constants.h"
 #include "scheduler.h"
 
@@ -153,10 +154,17 @@ void print_graph_edges(NodeList* nodes){
             continue;
         }
 
+        char* edge_types[3] = {"Data", "Serial", "Conflict"};
+
         //print edge with children
         Child* child = (Child*) node->node->first_child->next;
         while(child != NULL){
-            printf("\t%i->%i;\n", node->node->num, child->node->num);
+            if(child->edge == def){
+                printf("\t%i->%i [label = \"%s VR%i\"];\n", node->node->num, child->node->num, edge_types[child->edge], child->register_cause);
+            } else {
+                printf("\t%i->%i [label = \"%s\"];\n", node->node->num, child->node->num, edge_types[child->edge]);
+            }
+            
             child = child->next;
         }
 
@@ -242,6 +250,8 @@ void h(){
  *           0 on success
 */
 int schedule(char* filename){
+    // clock_t start = clock();
+
     //allocate
     token* tok = malloc(sizeof(token));
     if(tok == NULL) return -1;
@@ -275,8 +285,12 @@ int schedule(char* filename){
     NodeList* leaves = build_dependency_graph(head, *maxVR);
     if(leaves == NULL) return -1;
 
+    // clock_t end = clock();
+
     //print dependency  
     print_graph(leaves);
+
+    // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
 }
 
 

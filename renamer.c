@@ -48,6 +48,8 @@ int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxliv
 
     //check null
     if(SRtoVR == NULL || LU == NULL){
+        free(SRtoVR);
+        free(LU);
         return -1;
     }
     
@@ -324,5 +326,9 @@ int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxliv
     //pass values
     *maxVR = VRName;
     *maxlive_ptr = maxlive;
+
+    //free arrays
+    free(SRtoVR);
+    free(LU);
     return 0;
 }
