@@ -53,6 +53,10 @@ uint8_t delta_char[53][NUMBER + 28];
 uint8_t* CHAR_CLASS;
 
 
+//function declaration
+void close_scanner();
+
+
 //simple function
 //CAN BE OPTIMIZED INTO DOUBLE BUFFER
 char get_next_char(){
@@ -204,6 +208,7 @@ token get_next_token(){
             if(eol_inserted){
                 type = EoF;
                 name = eof;
+                close_scanner();
             } else{
                 type = EOL;
                 name = eol;

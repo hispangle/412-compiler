@@ -1,5 +1,5 @@
-#ifndef SCHEDULER_H
-#define SCHEDULER_H
+#ifndef GRAPH_H
+#define GRAPH_H
 #include <stdbool.h>
 #include "constants.h"
 

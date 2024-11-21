@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "constants.h"
-#include "scheduler.h"
+#include "graph.h"
 
 //externs
 extern int setup_scanner(char* filename);
@@ -60,6 +60,7 @@ const char* TOKEN_NAMES[] = {
 /*
  * Prints an individual line of ILOC code. Does not print new line afterwards.
  * The type of value printed depends on type.
+ * 
  * Requires: IR* ir, the line to be printed. must be non null.
  *           Type type, the type of register to print.
  * Returns: nothing.
@@ -121,6 +122,7 @@ void print_IR(IR* ir, Type type){
 /*
  * Prints the sequence of ILOC commands given at head. The
  * information printed depends on the type given. 
+ * 
  * Requires: IR* head, the head of the linked list of the IR representation. Must be non null.
  *           Type type, the kind of register to be printed.
  * Returns: Nothing.
@@ -138,6 +140,7 @@ void print_IR_List(IR* head, Type type){
  * Prints all the graph edges between nodes and their children.
  * Then recursively prints edges from children and their children.
  * Changes node->complete to false for each node.
+ * 
  * Requires: NodeList* nodes, the list of nodes whos edges to print. Must be non null.
  * Returns: Nothing.
 */
@@ -182,6 +185,7 @@ void print_graph_edges(NodeList* nodes){
  * Prints all the graph nodes in the list of nodes, in a format readable by graphviz.
  * Also prints the children of each node recursively.
  * Sets node->successful to true for each node printed.
+ * 
  * Requires: NodeList* nodes, a list of nodes to print. Must be non null.
  * Returns: nothing.
 */
@@ -215,6 +219,7 @@ void print_graph_nodes(NodeList* nodes){
 /*
  * Prints the dependency graph given by the leaves in dot format, readable by graphviz.
  * Sets node->num for each node in the dependency graph.
+ * 
  * Requires: NodeList* leaves, the list of leaves of the dependency graph. Must be non null.
  * Returns: nothing
 */
@@ -227,9 +232,10 @@ void print_graph(NodeList* leaves){
 
 /*
  * Prints out all functionality of this program in a useful manner.
+ * Program should terminate afterwards.
+ *
  * Requires: nothing.
  * Returns: nothing.
- * Program should terminate afterwards.
 */
 void h(){
     printf("Help for 412alloc (412 Register Allocator):\n");
@@ -243,9 +249,10 @@ void h(){
 
 /*
  * Conducts the scheduling of an ILOC code.
- * Requires: char* filename, the name of the file containing the ILOC program;
  * If the file does not contain a valid ILOC program, then prints all errors found to stderr.
  * If the file has a valid ILOC program, it schedules the program to work units.
+ * 
+ * Requires: char* filename, the name of the file containing the ILOC program. must be non null.
  * Returns: -1 on failure
  *           0 on success
 */
@@ -295,13 +302,17 @@ int schedule(char* filename){
 
 
 /*
- *
- *
+ * Driver function for code. 
+ * Currently looks for either a -h flag or a filename.
+ * -h flag prints help function.
+ * filename invokes the schedule function
+ * Prints the help function if neither are found.
  * 
+ * Requires: int argc, the number of arguments in argv.
+ *           char* argv[], the arguments passed to the schedule executable.
  * 
- * 
- * 
- * 
+ * Returns: 0 on success
+ *          -1 on failure
 */
 int main(int argc, char* argv[]){
     //flags
