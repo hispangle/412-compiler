@@ -145,10 +145,9 @@ void print_IR_List(IR* head, Type type){
  * Returns: Nothing.
 */
 void print_graph_edges(NodeList* nodes){
-    NodeList* node = nodes->next;
-
     //print nodes
-    while(node != NULL){
+    NodeList* node = nodes->next;
+    while(node != nodes){
         IR* op = node->node->op;
 
         //skip if node has been printed
@@ -161,13 +160,12 @@ void print_graph_edges(NodeList* nodes){
 
         //print edge with children
         Child* child = (Child*) node->node->first_child->next;
-        while(child != NULL){
+        while(child != node->node->first_child){
             if(child->edge == def){
                 printf("\t%i->%i [label = \"%s VR%i\"];\n", node->node->num, child->node->num, edge_types[child->edge], child->register_cause);
             } else {
                 printf("\t%i->%i [label = \"%s\"];\n", node->node->num, child->node->num, edge_types[child->edge]);
             }
-            
             child = child->next;
         }
 
@@ -175,8 +173,9 @@ void print_graph_edges(NodeList* nodes){
         node->node->complete = false;
 
         //print children
+        
         print_graph_edges((NodeList*) (node->node->first_child));
-
+        
         node = node->next;
     }
 }
@@ -192,7 +191,7 @@ void print_graph_edges(NodeList* nodes){
 void print_graph_nodes(NodeList* nodes){
     //cycle thru nodes in the list
     NodeList* node = nodes->next;
-    while(node != NULL){
+    while(node != nodes){
         IR* op = node->node->op;
 
         //skip if node has been printed

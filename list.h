@@ -18,7 +18,7 @@ struct _List{
  * Requires: List* list_item, the item of the list to be removed
  * Returns: nothing
 */
-void remove_circularly_doubly(List* list_item){
+inline static void remove_circularly_doubly(List* list_item){
     if(list_item == NULL) return;
 
     List* prev = list_item->prev;
@@ -26,6 +26,7 @@ void remove_circularly_doubly(List* list_item){
 
     prev->next = next;
     next->prev = prev;
+    return;
 }
 
 /*
@@ -37,7 +38,7 @@ void remove_circularly_doubly(List* list_item){
  * Requires: List* list_item, the item of the list to be removed
  * Returns: nothing
 */
-void remove_doubly(List* list_item){
+inline static void remove_doubly(List* list_item){
     if(list_item == NULL) return;
 
     List* prev = list_item->prev;
@@ -45,6 +46,25 @@ void remove_doubly(List* list_item){
 
     if(prev != NULL) prev->next = next;
     if(next != NULL) next->prev = prev;
+    return;
+}
+
+/*
+*/
+inline static void add_circularly_doubly(List* list_head, List* item){
+    list_head->prev->next = item;
+    item->prev = list_head->prev;
+    item->next = list_head;
+    list_head->prev = item;
+    return;
+}
+
+/*
+*/
+inline static void add_doubly(List* list_tail, List* item){
+    list_tail->next = item;
+    item->prev = list_tail;
+    return;
 }
 
 #endif

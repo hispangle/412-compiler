@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "constants.h"
 #include "graph.h"
+#include "list.h"
 
 //function declarations
 inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit, uint32_t n_parents);
@@ -12,6 +13,16 @@ inline static int add_memory_dependency(Node* node, Node** parent_location, Node
 inline static Node* find_last_memory_dependency(Node* node, NodeList* last);
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
 
+
+/*
+*/
+inline static NodeList* new_list(){
+    NodeList* list = malloc(sizeof(NodeList));
+    if(list == NULL) return NULL;
+    list->next = list;
+    list->prev = list;
+    return list;
+}
 
 
 /*
@@ -34,12 +45,13 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     if(node == NULL) return NULL;
     
     //calloc child
-    Child* child = calloc(1, sizeof(Child));
+    Child* child = malloc(sizeof(Child));
     if(child == NULL) return NULL;
+    child->next = child;
+    child->prev = child;
     
     //set children
     node->first_child = child;
-    node->last_child = child;
 
     //set fields to arguments
     node->op = op;
@@ -79,12 +91,26 @@ inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_
     child->register_cause = register_cause;
 
     //add to parent
-    parent->last_child->next = child;
-    parent->last_child = child;
+    add_circularly_doubly((List*) parent->first_child, (List*) child);
     parent->n_children++;
 
     return 0;
 }
+
+/*
+*/
+inline static int add_node_to_list(NodeList* list, Node* node){
+    //create NodeList to house node
+    NodeList* next_list = calloc(1, sizeof(NodeList));
+    if(next_list == NULL) return -1;
+    next_list->node = node;
+
+    //add to list
+    add_circularly_doubly((List*) list, (List*) next_list);
+
+    return 0;
+}
+
 
 /*
 */
@@ -102,8 +128,8 @@ inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef, ui
 
 /*
 */
-inline static int add_memory_dependency(Node* node, Node** parent_location, NodeList* last, EdgeType edge){
-    *parent_location = find_last_memory_dependency(node, last);
+inline static int add_memory_dependency(Node* node, Node** parent_location, NodeList* head, EdgeType edge){
+    *parent_location = find_last_memory_dependency(node, head);
 
     //make children
     if(*parent_location == NULL) node->n_parents--;
@@ -114,12 +140,12 @@ inline static int add_memory_dependency(Node* node, Node** parent_location, Node
 
 /*
 */
-inline static Node* find_last_memory_dependency(Node* node, NodeList* last){
+inline static Node* find_last_memory_dependency(Node* node, NodeList* head){
     //if memory address known, skip different addresses
     if(node->mem_loc != NULL){
         //loop backwards in list
-        NodeList* current = last;
-        while(current->prev != NULL){
+        NodeList* current = head->prev;
+        while(current != head){
             uint32_t* mem = current->node->mem_loc;
 
             //unknown or same address
@@ -132,7 +158,7 @@ inline static Node* find_last_memory_dependency(Node* node, NodeList* last){
     } 
     //otherwise return the latest
     else {
-        return last->node;
+        return head->prev->node;
     }
 
     return NULL;
@@ -153,27 +179,20 @@ inline static Node* find_last_memory_dependency(Node* node, NodeList* last){
 */
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     //create the leaves list
-    NodeList* leaves = calloc(1, sizeof(NodeList)); //dummy head
+    NodeList* leaves = new_list(); //dummy head
     if(leaves == NULL) return NULL;
-    NodeList* last_leaf = leaves;
 
     //create the load list
-    NodeList* load_list = calloc(1, sizeof(NodeList)); //dummy head
+    NodeList* load_list = new_list(); //dummy head
     if(load_list == NULL) return NULL;
-    NodeList* last_load = load_list;
-    uint32_t n_loads = 0;
 
     //create the output list
-    NodeList* output_list = calloc(1, sizeof(NodeList)); //dummy head
+    NodeList* output_list = new_list(); //dummy head
     if(output_list == NULL) return NULL;
-    NodeList* last_output = output_list;
-    uint32_t n_outputs = 0;
 
     //create the store list
-    NodeList* store_list = calloc(1, sizeof(NodeList)); //dummy head
+    NodeList* store_list = new_list(); //dummy head
     if(store_list == NULL) return NULL;
-    NodeList* last_store = store_list;
-    uint32_t n_stores = 0;
 
     //create a VR to DEF map
     Node** VRtoDef = calloc((maxVR + 1), sizeof(Node*));
@@ -222,17 +241,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 
                 //memory dependencies
                 //store->load (RAW) conflict
-                if(add_memory_dependency(node, &(node->last_store), last_store, conflict)) return NULL;
+                if(add_memory_dependency(node, &(node->last_store), store_list, conflict)) return NULL;
 
                 //add to load_list
-                NodeList* next_load = calloc(1, sizeof(NodeList));
-                if(next_load == NULL) return NULL;
-                next_load->node = node;
-
-                last_load->next = next_load;
-                next_load->prev = last_load;
-                last_load = next_load;
-                n_loads++;
+                if(add_node_to_list(load_list, node)) return NULL;
 
                 break;
             case store:
@@ -252,8 +264,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
                 //memory dependencies
                 //store->store (WAW) serialization
-                if(add_memory_dependency(node, &(node->last_store), last_store, serial)) return NULL;
-
+                if(add_memory_dependency(node, &(node->last_store), store_list, serial)) return NULL;
 
                 //find all load nodes with the same or unknown memory address
                 NodeList* load_store = calloc(1, sizeof(NodeList));
@@ -262,7 +273,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 uint32_t n_load_serial = 0;
 
                 NodeList* load_node = load_list->next;
-                for(uint32_t i = 0; i < n_loads; i++){
+                while(load_node != load_list){
                     //if a def dependency already exists, do not make another child
                     if(load_node->node == node->def_1 || load_node->node == node->def_2){
                         load_node = load_node->next;
@@ -301,19 +312,11 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 node->n_loads = n_load_serial;
                 node->n_parents += n_load_serial;
 
-
                 //output->store (WAR) serialization
-                if(add_memory_dependency(node, &(node->last_output), last_output, serial)) return NULL;
+                if(add_memory_dependency(node, &(node->last_output), output_list, serial)) return NULL;
 
                 //add to store_list
-                NodeList* next_store = calloc(1, sizeof(NodeList));
-                if(next_store == NULL) return NULL;
-                next_store->node = node;
-
-                last_store->next = next_store;
-                next_store->prev = last_store;
-                last_store = next_store;
-                n_stores++;
+                if(add_node_to_list(store_list, node)) return NULL;
 
                 break;
             case loadI:
@@ -328,14 +331,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 VRtoConst[VR_3] = &(op->arg1.VR);
 
                 //create leaf
-                NodeList* next_leaf = calloc(1, sizeof(NodeList));
-                if(next_leaf == NULL) return NULL;
-                next_leaf->node = node;
-
-                //extend list
-                last_leaf->next = next_leaf;
-                last_leaf = next_leaf;
-
+                if(add_node_to_list(leaves, node)) return NULL;
+                
                 break;
             case add:
             case sub:
@@ -397,36 +394,23 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
                 //memory dependencies
                 //output->output (deterministic) serialization
-                if(add_memory_dependency(node, &(node->last_output), last_output, serial)) return NULL;
+                if(add_memory_dependency(node, &(node->last_output), output_list, serial)) return NULL;
 
                 //memory location
                 node->mem_loc = &(op->arg1.VR);
 
                 //store->output (RAW) serialization
-                if(add_memory_dependency(node, &(node->last_store), last_store, serial)) return NULL;
+                if(add_memory_dependency(node, &(node->last_store), store_list, serial)) return NULL;
 
                 //check if leaf (only possible if no stores or outputs beforehand)
                 if(!node->n_parents){
                     //create leaf
-                    NodeList* next_leaf = calloc(1, sizeof(NodeList));
-                    if(next_leaf == NULL) return NULL;
-                    next_leaf->node = node;
-
-                    //extend list
-                    last_leaf->next = next_leaf;
-                    last_leaf = next_leaf;
+                    add_node_to_list(leaves, node);
                 }
 
 
                 //add to output_list
-                NodeList* next_output = calloc(1, sizeof(NodeList));
-                if(next_output == NULL) return NULL;
-                next_output->node = node;
-
-                last_output->next = next_output;
-                next_output->prev = last_output;
-                last_output = next_output;
-                n_outputs++;
+                add_node_to_list(output_list, node);
         
                 break;
             default:

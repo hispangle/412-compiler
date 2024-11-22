@@ -4,3 +4,4 @@ old_renamer.c
 *.o
 schedule
 test*
+core*
