@@ -47,32 +47,18 @@ struct _Node{
     uint32_t* mem_loc;
 
     //n_parents and n_ready for early release
-    uint32_t n_parents;
     uint32_t n_ready;
-
-    //use dependencies
-    Node* def_1;
-    Node* def_2;
-
-    //serial + conflict dependencies
-    //load and output conflict; store serialization
-    Node* last_store;
-
-    //output and store serialization
-    Node* last_output;
-
-    //store serialization
-    uint32_t n_loads;
-    NodeList* all_loads;
+    uint32_t n_parents;
+    NodeList* parents;
 
     //children
     uint32_t n_children;
-    Child* first_child; //dummy head
-    Child* last_child;
+    Child* children; //dummy head
 };
 
 
 //linked list of nodes
+//adheres to List type
 struct _NodeList{
     NodeList* next;
     NodeList* prev;
@@ -87,7 +73,7 @@ typedef enum {
 } EdgeType;
 
 //linked list of children
-//has an additional 'type' attribute to NodeList
+//adheres to List type
 struct _Child{
     Child* next;
     Child* prev;

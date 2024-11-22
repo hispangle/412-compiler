@@ -6,11 +6,15 @@
 #include "list.h"
 
 //function declarations
-inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit, uint32_t n_parents);
+inline static NodeList* new_list(void);
+inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
 inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
-inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef, uint8_t n_use);
-inline static int add_memory_dependency(Node* node, Node** parent_location, NodeList* last, EdgeType edge);
-inline static Node* find_last_memory_dependency(Node* node, NodeList* last);
+inline static int add_new_parent(Node* node, Node* parent);
+inline static int add_node_to_list(Node* node, NodeList* list);
+inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef);
+inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
+inline static int add_memory_dependency_list(Node* node, NodeList* head);
+inline static Node* find_last_memory_dependency(Node* node, NodeList* head);
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
 
 
@@ -26,39 +30,44 @@ inline static NodeList* new_list(){
 
 
 /*
- * Initializes a new Node
- * Creates a linked list head for children
- * Assigns given op_num to node.
+ * Initializes a new Node.
+ * Creates a linked list head for children and parents.
+ * Assigns given arguments to node.
  * 
- * Requires: IR* op, the operation represented by this node. 
- *           uint32_t op_num, the op num to assign to node.
- *           uint8_t latency, the latency of processing this node.
- *           F_Unit unit, the functional unit(s) that can process this node.
- *           uint32_t n_parents, the expected number of parents this node will have.
+ * Requires: 
+ *      op: the operation represented by this node. 
+ *      op_num: the op num to assign to node.
+ *      latency: the latency of processing this node.
+ *      unit: the functional unit(s) that can process this node.
  * 
- * Returns: Node* node on success, the new node created.
- *          NULL on failure.
+ * Returns: 
+ *      Node* node on success, the new node created.
+ *      NULL on failure.
 */
-inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit, uint32_t n_parents){
+inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit){
     //malloc node
     Node* node = calloc(1, sizeof(Node));
     if(node == NULL) return NULL;
     
-    //calloc child
+    //malloc child
     Child* child = malloc(sizeof(Child));
     if(child == NULL) return NULL;
     child->next = child;
     child->prev = child;
     
     //set children
-    node->first_child = child;
+    node->children = child;
+
+    //make parents list
+    NodeList* parents = new_list();
+    if(parents == NULL) return NULL;
+    node->parents = parents;
 
     //set fields to arguments
     node->op = op;
     node->num = op_num;
     node->latency = latency;
     node->unit = unit;
-    node->n_parents = n_parents;
 
     //return initialized node
     return node;
@@ -91,7 +100,7 @@ inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_
     child->register_cause = register_cause;
 
     //add to parent
-    add_circularly_doubly((List*) parent->first_child, (List*) child);
+    add_circularly_doubly((List*) parent->children, (List*) child);
     parent->n_children++;
 
     return 0;
@@ -99,7 +108,16 @@ inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_
 
 /*
 */
-inline static int add_node_to_list(NodeList* list, Node* node){
+inline static int add_new_parent(Node* node, Node* parent){
+    if(add_node_to_list(parent, node->parents)) return -1;
+    node->n_parents++;
+    return 0;
+}
+
+
+/*
+*/
+inline static int add_node_to_list(Node* node, NodeList* list){
     //create NodeList to house node
     NodeList* next_list = calloc(1, sizeof(NodeList));
     if(next_list == NULL) return -1;
@@ -107,7 +125,6 @@ inline static int add_node_to_list(NodeList* list, Node* node){
 
     //add to list
     add_circularly_doubly((List*) list, (List*) next_list);
-
     return 0;
 }
 
@@ -115,11 +132,11 @@ inline static int add_node_to_list(NodeList* list, Node* node){
 /*
 */
 
-inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef, uint8_t n_use){
+inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef){
     //find and add parent
     Node* parent = VRtoDef[VR];
-    if(n_use == 1) node->def_1 = parent;
-    else           node->def_2 = parent;    
+    if(parent == NULL) return -1; //only possible on undefed use
+    if(add_new_parent(node, parent)) return -1;
 
     //create and add child
     if(add_new_child(node, parent, def, VR)) return -1;
@@ -128,12 +145,53 @@ inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef, ui
 
 /*
 */
-inline static int add_memory_dependency(Node* node, Node** parent_location, NodeList* head, EdgeType edge){
-    *parent_location = find_last_memory_dependency(node, head);
+inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge){
+    Node* parent = find_last_memory_dependency(node, head);
 
-    //make children
-    if(*parent_location == NULL) node->n_parents--;
-    else if(add_new_child(node, *parent_location, conflict, 0)) return -1;
+    //make children if parent exists
+    if(parent != NULL){
+        if(add_new_parent(node, parent)) return -1;
+        if(add_new_child(node, parent, conflict, 0)) return -1;
+    } 
+    return 0;
+}
+
+/*
+*/
+inline static int add_memory_dependency_list(Node* node, NodeList* head){
+    NodeList* depencency_list = new_list();
+    if(depencency_list == NULL) return -1;
+
+    //go thru all elements in list for dependencies
+    NodeList* list_element = head->next;
+    Node* def_parent_1 = node->parents->next->node;
+    Node* def_parent_2 = node->parents->next->next->node;
+    while(list_element != head){
+        //if a def dependency already exists, do not make another child
+        //def dependencies are always the first 2
+        //can add checks/input for different numbers of def dependencies
+        if(list_element->node == def_parent_1 || list_element->node == def_parent_2){
+            list_element = list_element->next;
+            continue;
+        } 
+
+        //if memory is different, continue
+        uint32_t* mem = list_element->node->mem_loc;
+        if(mem != NULL && node->mem_loc != NULL && *mem != *(node->mem_loc)){
+            list_element == list_element->next;
+            continue;
+        }
+
+        //make child //assumes serial edge
+        if(add_new_child(node, list_element->node, serial, 0)) return -1;
+
+        //add to parents
+        if(add_new_parent(node, list_element->node)) return -1;
+
+        //iterate
+        list_element = list_element->next;
+    }
+
     return 0;
 }
 
@@ -202,12 +260,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     uint32_t** VRtoConst = calloc((maxVR + 1), sizeof(uint32_t*));
     if(VRtoConst == NULL) return NULL;
 
-    //definitions
-    Node* node;
-    NodeList* current_store;
-    NodeList* current_output;
-
     //loop thru operations first to last
+    Node* node;
     uint32_t op_num = 0;
     IR* op = head->next;
     while(op != head){
@@ -225,11 +279,11 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
         switch(op->opcode){
             case load:
                 //create new node
-                node = new_node(op, op_num, 6, ZERO, 2); //def + store parents
+                node = new_node(op, op_num, 6, ZERO); 
                 if(node == NULL) return NULL;
 
                 //use dependency
-                if(add_use_dependency(node, VR_1, VRtoDef, 1)) return NULL;
+                if(add_use_dependency(node, VR_1, VRtoDef)) return NULL;
 
                 //add memory location
                 node->mem_loc = VRtoConst[VR_1];
@@ -238,90 +292,46 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //assign to VRtoDef
                 VRtoDef[VR_3] = node;
                 
-                
                 //memory dependencies
                 //store->load (RAW) conflict
-                if(add_memory_dependency(node, &(node->last_store), store_list, conflict)) return NULL;
+                if(add_memory_dependency(node, store_list, conflict)) return NULL;
 
                 //add to load_list
-                if(add_node_to_list(load_list, node)) return NULL;
+                if(add_node_to_list(node, load_list)) return NULL;
 
                 break;
             case store:
                 //create new node
-                node = new_node(op, op_num, 6, ZERO, 4); //2 defs + store + output
+                node = new_node(op, op_num, 6, ZERO);
                 if(node == NULL) return NULL;
 
                 //use dependencies
                 //use 1
-                if(add_use_dependency(node, VR_1, VRtoDef, 1)) return NULL;
+                if(add_use_dependency(node, VR_1, VRtoDef)) return NULL;
 
                 //use 2
-                if(add_use_dependency(node, VR_3, VRtoDef, 2)) return NULL;
+                if(add_use_dependency(node, VR_3, VRtoDef)) return NULL;
 
                 //add memory location
                 node->mem_loc = VRtoConst[VR_3];
 
                 //memory dependencies
                 //store->store (WAW) serialization
-                if(add_memory_dependency(node, &(node->last_store), store_list, serial)) return NULL;
-
-                //find all load nodes with the same or unknown memory address
-                NodeList* load_store = calloc(1, sizeof(NodeList));
-                if(load_store == NULL) return NULL;
-                NodeList* last_load_store = load_store;
-                uint32_t n_load_serial = 0;
-
-                NodeList* load_node = load_list->next;
-                while(load_node != load_list){
-                    //if a def dependency already exists, do not make another child
-                    if(load_node->node == node->def_1 || load_node->node == node->def_2){
-                        load_node = load_node->next;
-                        continue;
-                    } 
-
-                    //if memory is different, continue
-                    uint32_t* mem = load_node->node->mem_loc;
-                    if(mem != NULL && node->mem_loc != NULL && *mem != *(node->mem_loc)){
-                        load_node == load_node->next;
-                        continue;
-                    }
-
-                    //make child
-                    Child* child = calloc(1, sizeof(Child));
-                    if(child == NULL) return NULL;
-                    child->node = node;
-                    child->edge = serial;
-
-                    //update linked list
-                    load_node->node->last_child->next = child;
-                    load_node->node->last_child = child;
-                    load_node->node->n_children++;
-
-                    //add to load_store
-                    last_load_store->next = load_node;
-                    last_load_store = load_node;
-                    n_load_serial++;
-
-                    //iterate
-                    load_node = load_node->next;
-                }
-
-                //connect all loads with same or unknown memory address
-                node->all_loads = load_store;
-                node->n_loads = n_load_serial;
-                node->n_parents += n_load_serial;
+                if(add_memory_dependency(node, store_list, serial)) return NULL;
+                
+                //load->store (WAR) serializations
+                if(add_memory_dependency_list(node, load_list)) return NULL;
 
                 //output->store (WAR) serialization
-                if(add_memory_dependency(node, &(node->last_output), output_list, serial)) return NULL;
+                if(add_memory_dependency(node, output_list, serial)) return NULL;
 
                 //add to store_list
-                if(add_node_to_list(store_list, node)) return NULL;
+                if(add_node_to_list(node, store_list)) return NULL;
 
                 break;
             case loadI:
                 //create new node
-                node = new_node(op, op_num, 1, BOTH, 0); //always a leaf
+                node = new_node(op, op_num, 1, BOTH);
                 if(node == NULL) return NULL;
 
                 //definition
@@ -331,7 +341,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 VRtoConst[VR_3] = &(op->arg1.VR);
 
                 //create leaf
-                if(add_node_to_list(leaves, node)) return NULL;
+                if(add_node_to_list(node, leaves)) return NULL;
                 
                 break;
             case add:
@@ -340,15 +350,15 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
             case lshift:
             case rshift:
                 //create new node //latency (3 for mult, 1 for everything else) //mult can only be processed on unit one
-                node = new_node(op, op_num, op->opcode == mult ? 3 : 1, op->opcode == mult ? ONE : BOTH, 2); //2 defs
+                node = new_node(op, op_num, op->opcode == mult ? 3 : 1, op->opcode == mult ? ONE : BOTH);
                 if(node == NULL) return NULL;
 
                 //use dependencies
                 //use 1
-                if(add_use_dependency(node, VR_1, VRtoDef, 1)) return NULL;
+                if(add_use_dependency(node, VR_1, VRtoDef)) return NULL;
 
                 //use 2
-                if(add_use_dependency(node, VR_2, VRtoDef, 2)) return NULL;
+                if(add_use_dependency(node, VR_2, VRtoDef)) return NULL;
 
                 //if both uses are constants, propagate constant
                 uint32_t* const_1 = VRtoConst[VR_1];
@@ -379,7 +389,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                     VRtoConst[VR_3] = val;
                 }
 
-
                 //definition
                 //assign to VRtoDef
                 VRtoDef[VR_3] = node;
@@ -389,28 +398,26 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 break;
             case output:
                 //create new node
-                node = new_node(op, op_num, 1, ZERO, 2); //store + output
+                node = new_node(op, op_num, 1, ZERO); 
                 if(node == NULL) return NULL;
 
                 //memory dependencies
                 //output->output (deterministic) serialization
-                if(add_memory_dependency(node, &(node->last_output), output_list, serial)) return NULL;
+                if(add_memory_dependency(node, output_list, serial)) return NULL;
 
                 //memory location
                 node->mem_loc = &(op->arg1.VR);
 
                 //store->output (RAW) serialization
-                if(add_memory_dependency(node, &(node->last_store), store_list, serial)) return NULL;
+                if(add_memory_dependency(node, store_list, serial)) return NULL;
 
                 //check if leaf (only possible if no stores or outputs beforehand)
                 if(!node->n_parents){
-                    //create leaf
-                    add_node_to_list(leaves, node);
+                    add_node_to_list(node, leaves);
                 }
 
-
                 //add to output_list
-                add_node_to_list(output_list, node);
+                add_node_to_list(node, output_list);
         
                 break;
             default:

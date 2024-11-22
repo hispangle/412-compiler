@@ -159,8 +159,8 @@ void print_graph_edges(NodeList* nodes){
         char* edge_types[3] = {"Data", "Serial", "Conflict"};
 
         //print edge with children
-        Child* child = (Child*) node->node->first_child->next;
-        while(child != node->node->first_child){
+        Child* child = (Child*) node->node->children->next;
+        while(child != node->node->children){
             if(child->edge == def){
                 printf("\t%i->%i [label = \"%s VR%i\"];\n", node->node->num, child->node->num, edge_types[child->edge], child->register_cause);
             } else {
@@ -174,7 +174,7 @@ void print_graph_edges(NodeList* nodes){
 
         //print children
         
-        print_graph_edges((NodeList*) (node->node->first_child));
+        print_graph_edges((NodeList*) (node->node->children));
         
         node = node->next;
     }
@@ -209,7 +209,7 @@ void print_graph_nodes(NodeList* nodes){
         node->node->complete = true;
 
         //print children
-        print_graph_nodes((NodeList*) (node->node->first_child));
+        print_graph_nodes((NodeList*) (node->node->children));
 
         node = node->next;
     }
