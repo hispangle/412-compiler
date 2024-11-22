@@ -8,10 +8,19 @@ typedef struct _Node Node;
 typedef struct _NodeList NodeList;
 typedef struct _Child Child;
 
+typedef enum {
+    ZERO,
+    ONE,
+    BOTH
+} F_Unit;
+
 //Node struct for dependency graph
 struct _Node{
     //original instruction
     IR* op;
+
+    //the functional unit this node can be processed on
+    F_Unit unit;
 
     //completed boolean (unsure if used). currently used for print
     bool complete;
@@ -22,8 +31,17 @@ struct _Node{
     //latency of operation
     uint8_t latency;
 
-    //max remaining latency
-    uint32_t remaining_latency;
+    //remaining cycles
+    uint8_t remaining_cycles;
+
+    //subgraph critical path sum of latencies
+    uint32_t latency_cost;
+
+    //longest path of children
+    uint32_t len_longest_path;
+
+    //final heuristic of the node
+    uint32_t heuristic;
 
     // memory location used in a memop
     uint32_t* mem_loc;

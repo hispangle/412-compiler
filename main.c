@@ -257,7 +257,7 @@ void h(){
  *           0 on success
 */
 int schedule(char* filename){
-    // clock_t start = clock();
+    clock_t start = clock();
 
     //allocate
     token* tok = malloc(sizeof(token));
@@ -292,12 +292,12 @@ int schedule(char* filename){
     NodeList* leaves = build_dependency_graph(head, *maxVR);
     if(leaves == NULL) return -1;
 
-    // clock_t end = clock();
+    clock_t end = clock();
 
     //print dependency  
     print_graph(leaves);
 
-    // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
+    printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
 }
 
 
