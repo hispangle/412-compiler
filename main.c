@@ -193,7 +193,7 @@ int schedule(char* filename){
     //print dependency  
     print_graph(leaves);
 
-    printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
+    // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
 }
 
 
