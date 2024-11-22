@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "constants.h"
+#include "tokens.h"
 
 
 //have flag if eol already inserted before eof

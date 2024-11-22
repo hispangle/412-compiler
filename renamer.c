@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "constants.h"
+#include "ir.h"
 
 //conducts the renaming
 //returns 0 on success

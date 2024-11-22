@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "constants.h"
+#include "tokens.h"
+#include "ir.h"
 
 //change tok to global pointer in scanner
 //get_tok changes contents but not pointer

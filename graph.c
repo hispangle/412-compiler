@@ -1,11 +1,11 @@
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdio.h>
-#include "constants.h"
+#include "ir.h"
 #include "graph.h"
 #include "list.h"
 
 //function declarations
+extern inline void print_IR(IR* ir, Type type);
 inline static NodeList* new_list(void);
 inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
 inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
@@ -159,17 +159,14 @@ inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
 /*
 */
 inline static int add_memory_dependency_list(Node* node, NodeList* head){
-    NodeList* depencency_list = new_list();
-    if(depencency_list == NULL) return -1;
+    //get def dependencies (always the first two)
+    Node* def_parent_1 = node->parents->next->node;
+    Node* def_parent_2 = node->parents->next->next->node;
 
     //go thru all elements in list for dependencies
     NodeList* list_element = head->next;
-    Node* def_parent_1 = node->parents->next->node;
-    Node* def_parent_2 = node->parents->next->next->node;
     while(list_element != head){
         //if a def dependency already exists, do not make another child
-        //def dependencies are always the first 2
-        //can add checks/input for different numbers of def dependencies
         if(list_element->node == def_parent_1 || list_element->node == def_parent_2){
             list_element = list_element->next;
             continue;
@@ -435,9 +432,4 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     free(output_list);
     free(store_list);
     return leaves;
-}
-
-
-void calc_remaining_latency(NodeList* leaves){
-    
 }

@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
-#include "constants.h"
+#include "ir.h"
+#include "tokens.h"
 #include "graph.h"
 
 //externs
@@ -13,34 +14,7 @@ extern int32_t parse(IR** list, token* cur_tok, uint32_t* n_ops);
 extern int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxlive_ptr);
 extern NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
 
-//enums
-typedef enum {
-    SR,
-    VR,
-    PR
-} Type;
-
-
-//globals
-//token type
-//matches with TOKEN_NAMES
-const char* TOKEN_TYPES[] = {
-    "MEMOP",
-    "LOADI",
-    "COMMA",
-    "EOF",
-    "ARITHOP",
-    "OUTPUT",
-    "NOP",
-    "CONSTANT",
-    "REGISTER",
-    "INTO",
-    "EOL",
-    "ERROR"
-};
-
 //lexeme of tokens
-//matches TOKEN_TYPES order
 const char* TOKEN_NAMES[] = {
     "load", "store",
     "loadI",
@@ -57,84 +31,7 @@ const char* TOKEN_NAMES[] = {
 };
 
 
-/*
- * Prints an individual line of ILOC code. Does not print new line afterwards.
- * The type of value printed depends on type.
- * 
- * Requires: IR* ir, the line to be printed. must be non null.
- *           Type type, the type of register to print.
- * Returns: nothing.
-*/
-void print_IR(IR* ir, Type type){
-    // get the right value to print
-        uint32_t val1;
-        uint32_t val2;
-        uint32_t val3;
-        switch(type){
-            case SR:
-                val1 = ir->arg1.SR;
-                val2 = ir->arg2.SR;
-                val3 = ir->arg3.SR;
-                break;
-            case VR:
-                val1 = ir->arg1.VR;
-                val2 = ir->arg2.VR;
-                val3 = ir->arg3.VR;
-                break;
-            case PR:
-                val1 = ir->arg1.PR;
-                val2 = ir->arg2.PR;
-                val3 = ir->arg3.PR;
-                break;
-        }
 
-        // print based on opcode
-        switch(ir->opcode){
-            case load:
-            case store:
-                printf("%s ", TOKEN_NAMES[ir->opcode]);
-                printf("r%i => r%i", val1, val3);
-                break;
-            case loadI:
-                printf("%s ", TOKEN_NAMES[ir->opcode]);
-                printf("%i => r%i", val1, val3);
-                break;
-            case add:
-            case sub:
-            case mult:
-            case lshift:
-            case rshift:
-                printf("%s ", TOKEN_NAMES[ir->opcode]);
-                printf("r%i, r%i => r%i", val1, val2, val3);
-                break;
-            case output:
-                printf("%s ", TOKEN_NAMES[ir->opcode]);
-                printf("%i", val1);
-                break;
-            case nop:
-            printf("nop");
-                break;
-            default:
-                ;
-        }
-}
-
-/*
- * Prints the sequence of ILOC commands given at head. The
- * information printed depends on the type given. 
- * 
- * Requires: IR* head, the head of the linked list of the IR representation. Must be non null.
- *           Type type, the kind of register to be printed.
- * Returns: Nothing.
-*/
-void print_IR_List(IR* head, Type type){
-    IR* node = head->next;
-    while(node != head){
-        print_IR(node, type);
-        printf("\n");
-        node = node->next;
-    } 
-}
 
 /*
  * Prints all the graph edges between nodes and their children.

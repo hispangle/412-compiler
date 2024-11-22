@@ -12,17 +12,19 @@
  * execution.
  * Uses precalculated heuristics for execution.
  * 
- * Requires: NodeList* ready, the list of nodes in the ready set. Must be non null. Must be doubly linked.
- *           uint32_t n_ready, the number of nodes in the ready set.
- *           Node* nop_node, the node that will be inserted as NOP. 
- * Returns: Node**, the list of 2 Nodes to be executed. Malloced. 
- *          NULL on failure.
+ * Requires: 
+ *      NodeList* ready, the list of nodes in the ready set. Must be non null. Must be doubly linked.
+ *      uint32_t n_ready, the number of nodes in the ready set.
+ *      Node* nop_node, the node that will be inserted as NOP. 
+ * 
+ * Returns: 
+ *      Node**, the list of 2 Nodes to be executed. Malloced. 
+ *      NULL on failure.
 */
 Node** select_nodes(NodeList* ready, uint32_t n_ready, Node* nop_node){
     //create selection array
     Node** selection = malloc(2 * sizeof(Node*));
     if(selection == NULL) return NULL;
-
 
     //define nodes and heuristic
     Node* first;
@@ -73,19 +75,17 @@ Node** select_nodes(NodeList* ready, uint32_t n_ready, Node* nop_node){
         node_list = node_list->next;
     }
 
-
     //remove selected nodes from ready set
     remove_doubly((List*) first);
     remove_doubly((List*) second);
     
-
     //select the mult node if second is NULL and unit is BOTH
     if(second == NULL && first != NULL && first->unit == BOTH){
         second = first;
         first = nop_node;
     }
 
-    //replace nulls with noops and place in selection
+    //replace nulls with nops and place in selection
     *selection = first == NULL ? nop_node : first;
     *(selection + 1) = second == NULL ? nop_node : second;
 
