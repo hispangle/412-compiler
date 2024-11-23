@@ -4,16 +4,11 @@
 
 //typedef definitions
 typedef struct token token;
+typedef enum token_types token_types;
 
 //function definitions
 token get_next_token(void);
 token get_next_eol_token(void);
-
-//how tokens are structured
-struct token {
-    uint8_t type; //anything in token_types, but declared as uint8_t for size
-    uint32_t name; //anything in token_names (or constant of size below 2^31)
-};
 
 //enumerates index of each type
 enum token_types{
@@ -47,7 +42,6 @@ const static char* TOKEN_NAMES[] = {
     "Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"
 };
 
-
 //enumerates the index of each word
 //matches with the list above
 enum token_names{
@@ -71,6 +65,12 @@ enum token_names{
     overflow,
     invalid_op,
     invalid_sentence
+};
+
+//how tokens are structured
+struct token {
+    token_types type; //anything in token_types, but declared as uint8_t for size
+    uint32_t name; //anything in token_names (or constant of size below 2^31)
 };
 
 #endif

@@ -5,9 +5,12 @@
  * Prints an individual line of ILOC code. Does not print new line afterwards.
  * The type of value printed depends on type.
  * 
- * Requires: IR* ir, the line to be printed. must be non null.
- *           Type type, the type of register to print.
- * Returns: nothing.
+ * Requires: 
+ *      IR* ir: the line to be printed. must be non null.
+ *      Type type: the type of register to print.
+ * 
+ * Returns: 
+ *      nothing.
 */
 void print_IR(IR* ir, Type type){
     // get the right value to print
@@ -69,9 +72,12 @@ void print_IR(IR* ir, Type type){
  * Prints the sequence of ILOC commands given at head. The
  * information printed depends on the type given. 
  * 
- * Requires: IR* head, the head of the linked list of the IR representation. Must be non null.
- *           Type type, the kind of register to be printed.
- * Returns: Nothing.
+ * Requires: 
+ *      IR* head: the head of the linked list of the IR representation. Must be non null.
+ *      Type type: the kind of register to be printed.
+ * 
+ * Returns: 
+ *      Nothing.
 */
 void print_IR_List(IR* head, Type type){
     IR* node = head->next;

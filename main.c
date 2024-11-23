@@ -10,13 +10,7 @@
 //externs
 extern int setup_scanner(char* filename);
 extern int32_t parse(IR** list, token* cur_tok, uint32_t* n_ops);
-extern int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxlive_ptr);
-extern NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
-
-
-
-
-
+extern int rename_registers(IR* head, uint32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr);
 
 
 /*
@@ -41,9 +35,12 @@ void h(){
  * If the file does not contain a valid ILOC program, then prints all errors found to stderr.
  * If the file has a valid ILOC program, it schedules the program to work units.
  * 
- * Requires: char* filename, the name of the file containing the ILOC program. must be non null.
- * Returns: -1 on failure
- *           0 on success
+ * Requires: 
+ *      char* filename: the name of the file containing the ILOC program. must be non null.
+ * 
+ * Returns: 
+ *      0 on success
+ *      -1 on failure
 */
 int schedule(char* filename){
     clock_t start = clock();
@@ -72,19 +69,19 @@ int schedule(char* filename){
     IR* head = *list; //guaranteed to be non null
 
     //rename
-    if(rename_registers(*n_ops, head, maxVR, maxlive)) return -1;
+    if(rename_registers(head, *n_ops, maxVR, maxlive)) return -1;
 
     //print IR
     // print_IR_List(head, VR);
 
     //build dependency
-    NodeList* leaves = build_dependency_graph(head, *maxVR);
-    if(leaves == NULL) return -1;
+    NodeList* graph = build_dependency_graph(head, *maxVR, *n_ops);
+    if(graph == NULL) return -1;
 
     clock_t end = clock();
 
     //print dependency  
-    print_graph(leaves);
+    print_graph(graph);
 
     // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
 }
@@ -97,11 +94,13 @@ int schedule(char* filename){
  * filename invokes the schedule function
  * Prints the help function if neither are found.
  * 
- * Requires: int argc, the number of arguments in argv.
- *           char* argv[], the arguments passed to the schedule executable.
+ * Requires: 
+ *      int argc: the number of arguments in argv.
+ *      char* argv[]: the arguments passed to the schedule executable.
  * 
- * Returns: 0 on success
- *          -1 on failure
+ * Returns: 
+ *      0 on success
+ *      -1 on failure
 */
 int main(int argc, char* argv[]){
     //flags

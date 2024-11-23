@@ -20,10 +20,12 @@ struct List{
  * Removes list_item from the linked list.
  * Assumes List is circularly doubly linked.
  * Does not remove next and prev fields of list_item.
- * Does nothing if list_item is NULL
  * 
- * Requires: List* list_item, the item of the list to be removed
- * Returns: nothing
+ * Requires: 
+ *      List* list_item: the item of the list to be removed. Must be non null.
+ * 
+ * Returns: 
+ *      nothing
 */
 inline static void remove_from_list(List* list_item){
     List* prev = list_item->prev;
@@ -35,6 +37,15 @@ inline static void remove_from_list(List* list_item){
 }
 
 /*
+ * Adds item to the end of the list given at list_head
+ * Assumes list is circularly doubly linked.
+ * 
+ * Requires:
+ *      List* list_head: the head of the linked list
+ *      List* item: the item to be added
+ * 
+ * Returns:
+ *      nothing
 */
 inline static void add_to_list(List* list_head, List* item){
     list_head->prev->next = item;
@@ -43,6 +54,5 @@ inline static void add_to_list(List* list_head, List* item){
     list_head->prev = item;
     return;
 }
-
 
 #endif

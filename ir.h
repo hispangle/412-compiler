@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include "tokens.h"
 
-//typedef for compilation
+//typedef declarations
+typedef struct argument argument;
 typedef struct IR IR;
 typedef enum Type Type;
 
@@ -19,13 +20,13 @@ enum Type {
 };
 
 //how arguments are stored
-typedef struct {
+struct argument {
     uint32_t SR;
     uint32_t VR;
     uint32_t PR;
     uint32_t NU;
     uint8_t isLU;
-} argument;
+};
 
 
 //IR

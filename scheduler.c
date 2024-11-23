@@ -13,12 +13,12 @@
  * Uses precalculated heuristics for execution.
  * 
  * Requires: 
- *      NodeList* ready, the list of nodes in the ready set. Must be non null. Must be circularly doubly linked.
- *      uint32_t n_ready, the number of nodes in the ready set.
- *      Node* nop_node, the node that will be inserted as NOP. 
+ *      NodeList* ready: the list of nodes in the ready set. Must be non null. Must be circularly doubly linked.
+ *      uint32_t n_ready: the number of nodes in the ready set.
+ *      Node* nop_node: the node that will be inserted as NOP. 
  * 
  * Returns: 
- *      Node**, the list of 2 Nodes to be executed. Malloced. 
+ *      Node**, the list of 2 Nodes to be executed on success. Malloced. 
  *      NULL on failure.
 */
 Node** select_nodes(NodeList* ready, uint32_t n_ready, Node* nop_node){

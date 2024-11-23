@@ -17,11 +17,11 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
 inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
 inline static int add_new_parent(Node* node, Node* parent);
 inline static int add_node_to_list(Node* node, NodeList* list);
-inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef);
+inline static int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef);
 inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
 inline static int add_memory_dependency_list(Node* node, NodeList* head);
 inline static Node* find_last_memory_dependency(Node* node, NodeList* head);
-NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
+NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops);
 void print_graph(NodeList* nodes);
 
 //which functional unit(s) the node can run in
@@ -75,9 +75,6 @@ struct Node{
     //children
     uint32_t n_children;
     Child* children; //dummy head
-
-    //completed boolean. currently used for print
-    bool complete;
 
     //node number. used for print
     uint32_t num;

@@ -6,7 +6,7 @@
 //conducts the renaming
 //returns 0 on success
 //returns -1 on failure
-int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxlive_ptr){
+int rename_registers(IR* head, uint32_t n_ops, uint32_t* maxVR, uint32_t* maxlive_ptr){
     //gets the max SR
     uint32_t max_SR = 0;
     IR* node;

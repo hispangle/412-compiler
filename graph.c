@@ -7,12 +7,21 @@
 
 
 /*
+ * Creates and initializes a new linked list of nodes.
+ * Sets all fields of the dummy head. Node is NULL. 
+ * 
+ * Requires: 
+ *      nothing.
+ * 
+ * Returns:
+ *      NodeList*: the dummy head of the created list.
 */
 inline static NodeList* new_list(){
     NodeList* list = malloc(sizeof(NodeList));
     if(list == NULL) return NULL;
     list->next = list;
     list->prev = list;
+    list->node = NULL;
     return list;
 }
 
@@ -33,7 +42,7 @@ inline static NodeList* new_list(){
 */
 inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit){
     //malloc node
-    Node* node = calloc(1, sizeof(Node));
+    Node* node = malloc(sizeof(Node));
     if(node == NULL) return NULL;
     
     //malloc child
@@ -41,6 +50,7 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     if(child == NULL) return NULL;
     child->next = child;
     child->prev = child;
+    child->node = NULL;
     
     //set children
     node->children = child;
@@ -50,11 +60,19 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     if(parents == NULL) return NULL;
     node->parents = parents;
 
-    //set fields to arguments
+    //set fields
     node->op = op;
     node->num = op_num;
     node->latency = latency;
+    node->remaining_cycles = latency;
     node->unit = unit;
+    node->heuristic = 1;
+
+    //zero fields
+    node->mem_loc = NULL;
+    node->n_children = 0;
+    node->n_parents = 0;
+    node->n_ready = 0;
 
     //return initialized node
     return node;
@@ -66,13 +84,15 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
  * Assigns NULL to linked list fields.
  * Assigns passed arguments to appropriate fields.
  * 
- * Requires: Node* node, the node associated with the child.
- *           Node* parent, the parent of the child being created. Must be non null.
- *           EdgeType edge, the type of edge between this child and its parent.
- *           uint32_t register cause, the register that caused the node to be a child, if applicable (data/def edge).
+ * Requires: 
+ *      Node* node: the node associated with the child.
+ *      Node* parent: the parent of the child being created. Must be non null.
+ *      EdgeType edge: the type of edge between this child and its parent.
+ *      uint32_t register cause: the register that caused the node to be a child, if applicable (data/def edge).
  * 
- * Returns: 0 on success.
- *          -1 on failure.
+ * Returns: 
+ *      0 on success.
+ *      -1 on failure.
 */
 inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause){
     //create Child
@@ -102,10 +122,21 @@ inline static int add_new_parent(Node* node, Node* parent){
 }
 
 /*
+ * Adds the given node to the given node list.
+ * Creates a new NodeList to house the node and adds that to the node list.
+ * Does not modify node.
+ * 
+ * Requires:
+ *      Node* node: the node to be added.
+ *      NodeList*: the list to add to
+ * 
+ * Returns:
+ *      0 on success
+ *      -1 on failure
 */
 inline static int add_node_to_list(Node* node, NodeList* list){
     //create NodeList to house node
-    NodeList* next_list = calloc(1, sizeof(NodeList));
+    NodeList* next_list = malloc(sizeof(NodeList));
     if(next_list == NULL) return -1;
     next_list->node = node;
 
@@ -115,19 +146,51 @@ inline static int add_node_to_list(Node* node, NodeList* list){
 }
 
 /*
+ * Adds a data dependency to node from the node that defines the VR. 
+ * Does not add dependency if it has already been made by a different call with 
+ * the same node and VR. 
+ * Modifies node and its parent.
+ * 
+ * Requires:
+ *      Node* node: the node to make the dependency for.
+ *      uint32_t VR: the VR whose definition to search for.
+ *      Node** VRtoDef: the array that maps VRs to their definitions.
+ * 
+ * Returns:
+ *      0 on success
+ *      -1 on failure
 */
-inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef){
+inline static int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef){
     //find and add parent
     Node* parent = VRtoDef[VR];
-    if(parent == NULL) return -1; //only possible on undefed use
+    // if(parent == NULL) return -1; //only possible on undefed use
+
+    //check if double def
+    if(parent == node->parents->next->node) return 0;
+
+    //otherwise proceed as normal
     if(add_new_parent(node, parent)) return -1;
 
     //create and add child
     if(add_new_child(node, parent, def, VR)) return -1;
+
     return 0;
 }
 
 /*
+ * Adds a memory dependency (edge) between the node and the last node in the list 
+ * given by head that has the same memory access as node, or an unknown memory access.
+ * Edge type is given by edge. 
+ * Modifies node and some element of the list given at head.
+ * 
+ * Requires:
+ *      Node* node: the node looking for a memory dependency
+ *      NodeList* head: the dummy head of the list to search for the memory dependency
+ *      EdgeType edge: the type of edge to create
+ * 
+ * Returns:
+ *      0 on success
+ *      -1 on failure
 */
 inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge){
     Node* parent = find_last_memory_dependency(node, head);
@@ -141,6 +204,18 @@ inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
 }
 
 /*
+ * Creates a memory dependency (edge) between the given node and all nodes in the list that access the 
+ * same memory address as the node (including unknown). Does not duplicate existing edges with 
+ * definitions. Currently assumes the edge is a serial edge.
+ * Modifies node and an element of the list given by head.
+ * 
+ * Requires:
+ *      Node* node: the node for edges are looked. Must be non null.
+ *      NodeList* head: the head of the list that is being searched. Must be non null.
+ *      
+ * Returns: 
+ *      0 on success
+ *      -1 on failure
 */
 inline static int add_memory_dependency_list(Node* node, NodeList* head){
     //get def dependencies (always the first two)
@@ -158,9 +233,11 @@ inline static int add_memory_dependency_list(Node* node, NodeList* head){
 
         //if memory is different, continue
         uint32_t* mem = list_element->node->mem_loc;
-        if(mem != NULL && node->mem_loc != NULL && *mem != *(node->mem_loc)){
-            list_element = list_element->next;
-            continue;
+        if(mem != NULL && node->mem_loc != NULL){
+            if(*mem != *(node->mem_loc)){
+                list_element = list_element->next;
+                continue;
+            }
         }
 
         //make child //assumes serial edge
@@ -177,6 +254,20 @@ inline static int add_memory_dependency_list(Node* node, NodeList* head){
 }
 
 /*
+ * Find the last node in the list given that has the same memory address as node or 
+ * has an unknown memory address. Always gives the last node if node's memory address
+ * is unknown.
+ * Node with different addresses are not returned because they are 
+ * independent of this node.
+ * 
+ * Requires:
+ *      Node* node: the node whose address to compare to
+ *      NodeList* head: the dummy head of the list of nodes to search for.
+ * 
+ * Returns:
+ *      Node*: the node that satisfies conditions stated.
+ *          Is be NULL if no node satisfies 
+ *          the conditions. 
 */
 inline static Node* find_last_memory_dependency(Node* node, NodeList* head){
     //if memory address known, skip different addresses
@@ -209,14 +300,19 @@ inline static Node* find_last_memory_dependency(Node* node, NodeList* head){
  * Performs graph simplification as it is building the graph, built in to the algorithm.
  * Assumes store does not need all outputs, only the latest due to transitivity.
  * 
- * Requires: IR* head, the dummy head of a list of IRs. must be non null. VRs must be correct.
- *           uint32_t maxVR, the max virtual register number used in the IR.
- * Returns: NodeList* leaves on success, the list of leaves of the dependency graph.
- *          NULL on failure.
+ * Requires: 
+ *      IR* head: the dummy head of a list of IRs. must be non null.
+ *      uint32_t maxVR: the max virtual register number used in the IR.
+ *      uint32_t n_ops: the number of operations in the IR.
+ * 
+ * Returns: 
+ *      NodeList*, the dummy head of the list of all nodes in the 
+ *          dependency graph on success.
+ *      NULL on failure.
 */
-NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
-    //create the leaves list
-    NodeList* node_list = new_list(); //dummy head
+NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
+    //create the nodes list
+    NodeList* node_list = new_list();
     if(node_list == NULL) return NULL;
 
     //create the load list
@@ -241,9 +337,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
     //loop thru operations first to last
     Node* node;
-    uint32_t op_num = 0;
     IR* op = head->next;
-    while(op != head){
+    for(uint32_t op_num = 0; op_num < n_ops; op_num++){
         //skip nops
         if(op->opcode == nop){
             op = op->next;
@@ -262,7 +357,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 if(node == NULL) return NULL;
 
                 //use dependency
-                if(add_use_dependency(node, VR_1, VRtoDef)) return NULL;
+                if(add_data_dependency(node, VR_1, VRtoDef)) return NULL;
 
                 //add memory location
                 node->mem_loc = VRtoConst[VR_1];
@@ -286,10 +381,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
                 //use dependencies
                 //use 1
-                if(add_use_dependency(node, VR_1, VRtoDef)) return NULL;
-
+                if(add_data_dependency(node, VR_1, VRtoDef)) return NULL;
+                
                 //use 2
-                if(add_use_dependency(node, VR_3, VRtoDef)) return NULL;
+                if(add_data_dependency(node, VR_3, VRtoDef)) return NULL;
 
                 //add memory location
                 node->mem_loc = VRtoConst[VR_3];
@@ -331,10 +426,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
 
                 //use dependencies
                 //use 1
-                if(add_use_dependency(node, VR_1, VRtoDef)) return NULL;
+                if(add_data_dependency(node, VR_1, VRtoDef)) return NULL;
 
                 //use 2
-                if(add_use_dependency(node, VR_2, VRtoDef)) return NULL;
+                if(add_data_dependency(node, VR_2, VRtoDef)) return NULL;
 
                 //if both uses are constants, propagate constant
                 uint32_t* const_1 = VRtoConst[VR_1];
@@ -384,8 +479,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //memory location
                 node->mem_loc = &(op->arg1.VR);
 
-                //store->output (RAW) serialization
-                if(add_memory_dependency(node, store_list, serial)) return NULL;
+                //store->output (RAW) conflict
+                if(add_memory_dependency(node, store_list, conflict)) return NULL;
 
                 //add to output_list
                 add_node_to_list(node, output_list);
@@ -399,7 +494,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
         if(add_node_to_list(node, node_list)) return NULL;
 
         //increment
-        op_num++;
         op = op->next;
     }
 
@@ -428,36 +522,36 @@ void print_graph(NodeList* nodes){
     printf("digraph DG{\n");
 
     //print all graph nodes
-    NodeList* node = nodes->next;
-    while(node != nodes){
-        IR* op = node->node->op;
-
+    NodeList* item = nodes->next;
+    while(item != nodes){
         //print node
-        printf("\t%i [label=\"%i: ", node->node->num, node->node->num);
-        print_IR(op, VR);
+        Node* node = item->node;
+        printf("\t%i [label=\"%i: ", node->num, node->num);
+        print_IR(node->op, VR);
         printf("\"];\n");
-
-        node = node->next;
+        item = item->next;
     }
 
     //define type strings
     char* edge_types[3] = {"Data", "Serial", "Conflict"};
 
     //print edges
-    node = nodes->next;
-    while(node != nodes){
+    item = nodes->next;
+    while(item != nodes){
         //print all edges for this node
-        Child* child = (Child*) node->node->children->next;
-        while(child != node->node->children){
+        Node* node = item->node;
+
+        Child* child = (Child*) node->children->next;
+        for(uint32_t j = 0; j < node->n_children; j++){
             if(child->edge == def){
-                printf("\t%i->%i [label = \"%s VR%i\"];\n", node->node->num, child->node->num, edge_types[child->edge], child->register_cause);
+                printf("\t%i->%i [label = \"%s VR%i\"];\n", node->num, child->node->num, edge_types[child->edge], child->register_cause);
             } else {
-                printf("\t%i->%i [label = \"%s\"];\n", node->node->num, child->node->num, edge_types[child->edge]);
+                printf("\t%i->%i [label = \"%s\"];\n", node->num, child->node->num, edge_types[child->edge]);
             }
             child = child->next;
         }
 
-        node = node->next;
+        item = item->next;
     }
 
     //finish dot format
