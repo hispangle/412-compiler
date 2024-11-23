@@ -87,6 +87,9 @@ int schedule(char* filename){
     //run scheduler
     if(scheduler(graph)) return -1;
 
+    // print_graph(graph);
+    return 0;
+
     // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
 }
 

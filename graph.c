@@ -54,6 +54,7 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     node->n_children = 0;
     node->n_parents = 0;
     node->n_ready = 0;
+    node->releasable = false;
 
     //return initialized node
     return node;
@@ -330,6 +331,9 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
                 //add to load_list
                 if(add_node_to_list(node, load_list)) return NULL;
 
+                //can release children early
+                node->releasable = true;
+
                 break;
             case store:
                 //create new node
@@ -358,6 +362,9 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
 
                 //add to store_list
                 if(add_node_to_list(node, store_list)) return NULL;
+                
+                //can release children early
+                node->releasable = true;
 
                 break;
             case loadI:
@@ -426,7 +433,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
                 break;
             case output:
                 //create new node
-                node = new_node(op, op_num, 1, ZERO); 
+                node = new_node(op, op_num, 1, BOTH); 
                 if(node == NULL) return NULL;
 
                 //memory dependencies
@@ -441,6 +448,9 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
 
                 //add to output_list
                 add_node_to_list(node, output_list);
+                
+                //can release children early
+                node->releasable = true;
         
                 break;
             default:
@@ -485,7 +495,7 @@ void print_graph(NodeList* nodes){
         Node* node = item->node;
         printf("\t%i [label=\"%i: ", node->num, node->num);
         print_IR(node->op, VR);
-        printf("; n_par = %i\"];\n", node->n_parents);
+        printf("; n_par = %i; n_ready = %i; n_child = %i\"];\n", node->n_parents, node->n_ready, node->n_children);
         item = item->next;
     }
 

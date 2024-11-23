@@ -59,6 +59,9 @@ struct Node{
     //remaining cycles
     uint8_t remaining_cycles;
 
+    //if the node qualifies for early release checks
+    bool releasable;
+
     //final heuristic of the node
     uint32_t heuristic;
     

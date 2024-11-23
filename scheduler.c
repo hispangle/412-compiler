@@ -11,13 +11,11 @@ int early_release(NodeList* ready, uint32_t* n_ready, Node* node){
     for(uint32_t i = 0; i < node->n_children; i++){
         //check for serialization edge
         if(child->edge == serial){
-            
             //increase number of satisfied parents
             child->node->n_ready++;
 
             //if all parents satisfied, release child to ready set
             if(child->node->n_ready == child->node->n_parents){
-                printf("yipee!\n");
                 if(add_node_to_list(child->node, ready)) return -1;
                 (*n_ready)++;
             }
@@ -38,11 +36,16 @@ int increase_cycle(NodeList* ready, uint32_t* n_ready, NodeList* active_set, uin
             Node* node = active->node;
             node->remaining_cycles--;
 
-            //if node is complete
+            //if node is complete update children
             if(node->remaining_cycles == 0){
-                // printf("yipee!\n");
                 Child* child = node->children->next;
                 for(uint32_t j = 0; j < node->n_children; j++){
+                    //if serial edge ignore (already released with early release)
+                    if(child->edge == serial){
+                        child = child->next;
+                        continue;
+                    }
+
                     //increase number of parents satisfied
                     child->node->n_ready++;
                     
@@ -51,6 +54,8 @@ int increase_cycle(NodeList* ready, uint32_t* n_ready, NodeList* active_set, uin
                         if(add_node_to_list(child->node, ready)) return -1;
                         (*n_ready)++;
                     }
+
+                    child = child->next;
                 }
                 //keep count of completed operations, to reduce n_active after loop
                 remove_from_list((List*) active);
@@ -188,7 +193,7 @@ int scheduler(NodeList* graph){
 
         item = item->next;
     }
-    // printf("ready done\n");
+
     //active sets
     NodeList* active_0 = new_list();
     if(active_0 == NULL) return -1;
@@ -198,7 +203,7 @@ int scheduler(NodeList* graph){
 
     uint8_t n_active_0 = 0;
     uint8_t n_active_1 = 0;
-    // printf("active done\n");
+
     //selection space
     Node** selected = malloc(2 * sizeof(Node*));
     if(selected == NULL) return -1;
@@ -208,15 +213,17 @@ int scheduler(NodeList* graph){
     if(nop_line == NULL) return -1;
     nop_line->opcode = nop;
 
-    Node* nop_node = malloc(sizeof(Node));
+    //Node must be calloced (or at least latency set so it doesnt accidentally pass the latency check)
+    Node* nop_node = calloc(1, sizeof(Node));
     if(nop_node == NULL) return -1;
     nop_node->op = nop_line;
-    // printf("before loop\n");
+
     //main loop, iterates while ready set and active set exist
-    uint32_t cycle = 0;
     while(n_ready + n_active_0 + n_active_1){
         // printf("n_ready: %i\nn_active_0: %i\nn_active_1: %i\n\n", n_ready, n_active_0, n_active_1);
+        // print_graph(ready);
         // printf("loop\n");
+        // fprintf(stderr, "loop: ");
         //select nodes to print
         select_nodes(selected, ready, n_ready, nop_node);
         // printf("node selected: %p\n", selected[0]);
@@ -235,7 +242,7 @@ int scheduler(NodeList* graph){
             n_active_1++;
             n_ready--;
         }
-
+        
         //print scheduled cycle
         printf("[");
         print_IR(selected[0]->op, VR);
@@ -244,23 +251,18 @@ int scheduler(NodeList* graph){
         printf("]\n");
 
         //cycle
-        cycle++;
         if(increase_cycle(ready, &n_ready, active_0, &n_active_0)) return -1;
         if(increase_cycle(ready, &n_ready, active_1, &n_active_1)) return -1;
 
-        // //early release
-        // //load/store early release
-        // if(selected[0]->latency == 6){
-        //     if(early_release(ready, &n_ready, selected[0])) return -1;
-        //     printf("early n_ready: %i\n", n_ready);
-        // }
+        //early release
+        if(selected[0]->releasable){
+            if(early_release(ready, &n_ready, selected[0])) return -1;
+        }
 
-        // //mult early release
-        // if(selected[1]->latency == 3){
-        //     if(early_release(ready, &n_ready, selected[1])) return -1;
-        // }
-
-        
+        if(selected[1]->releasable){
+            if(early_release(ready, &n_ready, selected[1])) return -1;
+        }
     }
 
+    return 0;
 }
