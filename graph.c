@@ -7,25 +7,6 @@
 
 
 /*
- * Creates and initializes a new linked list of nodes.
- * Sets all fields of the dummy head. Node is NULL. 
- * 
- * Requires: 
- *      nothing.
- * 
- * Returns:
- *      NodeList*: the dummy head of the created list.
-*/
-inline static NodeList* new_list(){
-    NodeList* list = malloc(sizeof(NodeList));
-    if(list == NULL) return NULL;
-    list->next = list;
-    list->prev = list;
-    list->node = NULL;
-    return list;
-}
-
-/*
  * Initializes a new Node.
  * Creates a linked list head for children and parents.
  * Assigns given arguments to node.
@@ -118,30 +99,6 @@ inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_
 inline static int add_new_parent(Node* node, Node* parent){
     if(add_node_to_list(parent, node->parents)) return -1;
     node->n_parents++;
-    return 0;
-}
-
-/*
- * Adds the given node to the given node list.
- * Creates a new NodeList to house the node and adds that to the node list.
- * Does not modify node.
- * 
- * Requires:
- *      Node* node: the node to be added.
- *      NodeList*: the list to add to
- * 
- * Returns:
- *      0 on success
- *      -1 on failure
-*/
-inline static int add_node_to_list(Node* node, NodeList* list){
-    //create NodeList to house node
-    NodeList* next_list = malloc(sizeof(NodeList));
-    if(next_list == NULL) return -1;
-    next_list->node = node;
-
-    //add to list
-    add_to_list((List*) list, (List*) next_list);
     return 0;
 }
 
@@ -528,7 +485,7 @@ void print_graph(NodeList* nodes){
         Node* node = item->node;
         printf("\t%i [label=\"%i: ", node->num, node->num);
         print_IR(node->op, VR);
-        printf("\"];\n");
+        printf("; n_par = %i\"];\n", node->n_parents);
         item = item->next;
     }
 

@@ -2,6 +2,7 @@
 #define GRAPH_H
 #include <stdbool.h>
 #include "ir.h"
+#include "list.h"
 
 //typedef declarations
 typedef enum F_Unit F_Unit;
@@ -97,5 +98,49 @@ struct Child{
     EdgeType edge;
     uint32_t register_cause;
 };
+
+//inline function declared in header
+/*
+ * Creates and initializes a new linked list of nodes.
+ * Sets all fields of the dummy head. Node is NULL. 
+ * 
+ * Requires: 
+ *      nothing.
+ * 
+ * Returns:
+ *      NodeList*: the dummy head of the created list.
+*/
+inline static NodeList* new_list(){
+    NodeList* list = malloc(sizeof(NodeList));
+    if(list == NULL) return NULL;
+    list->next = list;
+    list->prev = list;
+    list->node = NULL;
+    return list;
+}
+
+/*
+ * Adds the given node to the given node list.
+ * Creates a new NodeList to house the node and adds that to the node list.
+ * Does not modify node.
+ * 
+ * Requires:
+ *      Node* node: the node to be added.
+ *      NodeList*: the list to add to
+ * 
+ * Returns:
+ *      0 on success
+ *      -1 on failure
+*/
+inline static int add_node_to_list(Node* node, NodeList* list){
+    //create NodeList to house node
+    NodeList* next_list = malloc(sizeof(NodeList));
+    if(next_list == NULL) return -1;
+    next_list->node = node;
+
+    //add to list
+    add_to_list((List*) list, (List*) next_list);
+    return 0;
+}
 
 #endif

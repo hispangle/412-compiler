@@ -3,8 +3,8 @@
 #include "graph.h"
 
 //function declarations
-Node** select_nodes(NodeList* ready, uint32_t n_ready, Node* nop_node);
-
+void select_nodes(NodeList* ready, uint32_t n_ready, Node* nop_node);
+int scheduler(NodeList* graph);
 #endif
 
 

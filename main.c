@@ -6,6 +6,7 @@
 #include "ir.h"
 #include "tokens.h"
 #include "graph.h"
+#include "scheduler.h"
 
 //externs
 extern int setup_scanner(char* filename);
@@ -81,7 +82,10 @@ int schedule(char* filename){
     clock_t end = clock();
 
     //print dependency  
-    print_graph(graph);
+    // print_graph(graph);
+
+    //run scheduler
+    if(scheduler(graph)) return -1;
 
     // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
 }
@@ -123,7 +127,7 @@ int main(int argc, char* argv[]){
         h();
     } 
     else if(argc > 0){
-        schedule(argv[1]);
+        if(schedule(argv[1])) printf("something went wrong!\n");
     }
     else{
         fprintf(stderr, "ERROR: Bad Arguments!\n");
