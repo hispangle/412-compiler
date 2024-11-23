@@ -13,7 +13,7 @@
  * Uses precalculated heuristics for execution.
  * 
  * Requires: 
- *      NodeList* ready, the list of nodes in the ready set. Must be non null. Must be doubly linked.
+ *      NodeList* ready, the list of nodes in the ready set. Must be non null. Must be circularly doubly linked.
  *      uint32_t n_ready, the number of nodes in the ready set.
  *      Node* nop_node, the node that will be inserted as NOP. 
  * 
@@ -76,8 +76,8 @@ Node** select_nodes(NodeList* ready, uint32_t n_ready, Node* nop_node){
     }
 
     //remove selected nodes from ready set
-    remove_doubly((List*) first);
-    remove_doubly((List*) second);
+    if(first != NULL) remove_from_list((List*) first);
+    if(second != NULL) remove_from_list((List*) second);
     
     //select the mult node if second is NULL and unit is BOTH
     if(second == NULL && first != NULL && first->unit == BOTH){

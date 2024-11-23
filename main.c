@@ -9,122 +9,15 @@
 
 //externs
 extern int setup_scanner(char* filename);
-extern token get_next_token();
 extern int32_t parse(IR** list, token* cur_tok, uint32_t* n_ops);
 extern int rename_registers(uint32_t n_ops, IR* head, uint32_t* maxVR, uint32_t* maxlive_ptr);
 extern NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
 
-//lexeme of tokens
-const char* TOKEN_NAMES[] = {
-    "load", "store",
-    "loadI",
-    ",",
-    "",
-    "add", "sub", "mult", "lshift", "rshift",
-    "output",
-    "nop",
-    "0",
-    "0",
-    "=>",
-    "\\n",
-    "Invalid spelling", "Overflow/Above Constant Limit", "Invalid Op", "Invalid Sentence"
-};
 
 
 
 
-/*
- * Prints all the graph edges between nodes and their children.
- * Then recursively prints edges from children and their children.
- * Changes node->complete to false for each node.
- * 
- * Requires: NodeList* nodes, the list of nodes whos edges to print. Must be non null.
- * Returns: Nothing.
-*/
-void print_graph_edges(NodeList* nodes){
-    //print nodes
-    NodeList* node = nodes->next;
-    while(node != nodes){
-        IR* op = node->node->op;
 
-        //skip if node has been printed
-        if(!node->node->complete){
-            node = node->next;
-            continue;
-        }
-
-        char* edge_types[3] = {"Data", "Serial", "Conflict"};
-
-        //print edge with children
-        Child* child = (Child*) node->node->children->next;
-        while(child != node->node->children){
-            if(child->edge == def){
-                printf("\t%i->%i [label = \"%s VR%i\"];\n", node->node->num, child->node->num, edge_types[child->edge], child->register_cause);
-            } else {
-                printf("\t%i->%i [label = \"%s\"];\n", node->node->num, child->node->num, edge_types[child->edge]);
-            }
-            child = child->next;
-        }
-
-        //update print completeness
-        node->node->complete = false;
-
-        //print children
-        
-        print_graph_edges((NodeList*) (node->node->children));
-        
-        node = node->next;
-    }
-}
-
-/*
- * Prints all the graph nodes in the list of nodes, in a format readable by graphviz.
- * Also prints the children of each node recursively.
- * Sets node->successful to true for each node printed.
- * 
- * Requires: NodeList* nodes, a list of nodes to print. Must be non null.
- * Returns: nothing.
-*/
-void print_graph_nodes(NodeList* nodes){
-    //cycle thru nodes in the list
-    NodeList* node = nodes->next;
-    while(node != nodes){
-        IR* op = node->node->op;
-
-        //skip if node has been printed
-        if(node->node->complete){
-            node = node->next;
-            continue;
-        }
-
-        //print node
-        printf("\t%i [label=\"%i: ", node->node->num, node->node->num);
-        print_IR(op, VR);
-        printf("\"];\n");
-
-        //indicate completeness of print
-        node->node->complete = true;
-
-        //print children
-        print_graph_nodes((NodeList*) (node->node->children));
-
-        node = node->next;
-    }
-}
-
-/*
- * Prints the dependency graph given by the leaves in dot format, readable by graphviz.
- * Sets node->num for each node in the dependency graph.
- * 
- * Requires: NodeList* leaves, the list of leaves of the dependency graph. Must be non null.
- * Returns: nothing
-*/
-void print_graph(NodeList* leaves){
-    printf("digraph DG{\n");
-    print_graph_nodes(leaves);
-    print_graph_edges(leaves);
-    printf("}\n");
-}
 
 /*
  * Prints out all functionality of this program in a useful manner.

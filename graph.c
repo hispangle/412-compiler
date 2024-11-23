@@ -1,21 +1,9 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include "ir.h"
 #include "graph.h"
 #include "list.h"
-
-//function declarations
-extern inline void print_IR(IR* ir, Type type);
-inline static NodeList* new_list(void);
-inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
-inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
-inline static int add_new_parent(Node* node, Node* parent);
-inline static int add_node_to_list(Node* node, NodeList* list);
-inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef);
-inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
-inline static int add_memory_dependency_list(Node* node, NodeList* head);
-inline static Node* find_last_memory_dependency(Node* node, NodeList* head);
-NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
 
 
 /*
@@ -27,7 +15,6 @@ inline static NodeList* new_list(){
     list->prev = list;
     return list;
 }
-
 
 /*
  * Initializes a new Node.
@@ -100,7 +87,7 @@ inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_
     child->register_cause = register_cause;
 
     //add to parent
-    add_circularly_doubly((List*) parent->children, (List*) child);
+    add_to_list((List*) parent->children, (List*) child);
     parent->n_children++;
 
     return 0;
@@ -114,7 +101,6 @@ inline static int add_new_parent(Node* node, Node* parent){
     return 0;
 }
 
-
 /*
 */
 inline static int add_node_to_list(Node* node, NodeList* list){
@@ -124,14 +110,12 @@ inline static int add_node_to_list(Node* node, NodeList* list){
     next_list->node = node;
 
     //add to list
-    add_circularly_doubly((List*) list, (List*) next_list);
+    add_to_list((List*) list, (List*) next_list);
     return 0;
 }
 
-
 /*
 */
-
 inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef){
     //find and add parent
     Node* parent = VRtoDef[VR];
@@ -151,7 +135,7 @@ inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
     //make children if parent exists
     if(parent != NULL){
         if(add_new_parent(node, parent)) return -1;
-        if(add_new_child(node, parent, conflict, 0)) return -1;
+        if(add_new_child(node, parent, edge, 0)) return -1;
     } 
     return 0;
 }
@@ -175,7 +159,7 @@ inline static int add_memory_dependency_list(Node* node, NodeList* head){
         //if memory is different, continue
         uint32_t* mem = list_element->node->mem_loc;
         if(mem != NULL && node->mem_loc != NULL && *mem != *(node->mem_loc)){
-            list_element == list_element->next;
+            list_element = list_element->next;
             continue;
         }
 
@@ -191,7 +175,6 @@ inline static int add_memory_dependency_list(Node* node, NodeList* head){
 
     return 0;
 }
-
 
 /*
 */
@@ -219,7 +202,6 @@ inline static Node* find_last_memory_dependency(Node* node, NodeList* head){
     return NULL;
 }
 
-
 /*
  * Builds a dependency graph of a given IR. Assumes IR has been renamed.
  * Assumes VRs are used. Uses constant propagation to determine if an address
@@ -234,8 +216,8 @@ inline static Node* find_last_memory_dependency(Node* node, NodeList* head){
 */
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     //create the leaves list
-    NodeList* leaves = new_list(); //dummy head
-    if(leaves == NULL) return NULL;
+    NodeList* node_list = new_list(); //dummy head
+    if(node_list == NULL) return NULL;
 
     //create the load list
     NodeList* load_list = new_list(); //dummy head
@@ -315,7 +297,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //memory dependencies
                 //store->store (WAW) serialization
                 if(add_memory_dependency(node, store_list, serial)) return NULL;
-                
+
                 //load->store (WAR) serializations
                 if(add_memory_dependency_list(node, load_list)) return NULL;
 
@@ -337,9 +319,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //constant
                 VRtoConst[VR_3] = &(op->arg1.VR);
 
-                //create leaf
-                if(add_node_to_list(node, leaves)) return NULL;
-                
                 break;
             case add:
             case sub:
@@ -408,11 +387,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 //store->output (RAW) serialization
                 if(add_memory_dependency(node, store_list, serial)) return NULL;
 
-                //check if leaf (only possible if no stores or outputs beforehand)
-                if(!node->n_parents){
-                    add_node_to_list(node, leaves);
-                }
-
                 //add to output_list
                 add_node_to_list(node, output_list);
         
@@ -421,6 +395,10 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
                 break;
         }
 
+        //add to node list
+        if(add_node_to_list(node, node_list)) return NULL;
+
+        //increment
         op_num++;
         op = op->next;
     }
@@ -431,5 +409,57 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR){
     free(load_list);
     free(output_list);
     free(store_list);
-    return leaves;
+    return node_list;
+}
+
+
+/*
+ * Prints the dependency graph given by the nodes in dot format, readable by graphviz.
+ * Does not modify the graph, or the nodes of the graph.
+ * 
+ * Requires: 
+ *      NodeList* nodes, the list of nodes of the dependency graph. Must be non null.
+ * 
+ * Returns: 
+ *      nothing
+*/
+void print_graph(NodeList* nodes){
+    //print in dot format
+    printf("digraph DG{\n");
+
+    //print all graph nodes
+    NodeList* node = nodes->next;
+    while(node != nodes){
+        IR* op = node->node->op;
+
+        //print node
+        printf("\t%i [label=\"%i: ", node->node->num, node->node->num);
+        print_IR(op, VR);
+        printf("\"];\n");
+
+        node = node->next;
+    }
+
+    //define type strings
+    char* edge_types[3] = {"Data", "Serial", "Conflict"};
+
+    //print edges
+    node = nodes->next;
+    while(node != nodes){
+        //print all edges for this node
+        Child* child = (Child*) node->node->children->next;
+        while(child != node->node->children){
+            if(child->edge == def){
+                printf("\t%i->%i [label = \"%s VR%i\"];\n", node->node->num, child->node->num, edge_types[child->edge], child->register_cause);
+            } else {
+                printf("\t%i->%i [label = \"%s\"];\n", node->node->num, child->node->num, edge_types[child->edge]);
+            }
+            child = child->next;
+        }
+
+        node = node->next;
+    }
+
+    //finish dot format
+    printf("}\n");
 }

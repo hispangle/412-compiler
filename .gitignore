@@ -4,4 +4,6 @@ old_renamer.c
 *.o
 schedule
 test*
+output*
 core*
+graphs

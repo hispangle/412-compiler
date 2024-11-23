@@ -3,33 +3,49 @@
 #include <stdbool.h>
 #include "ir.h"
 
-//typing for compilation
-typedef struct _Node Node;
-typedef struct _NodeList NodeList;
-typedef struct _Child Child;
+//typedef declarations
+typedef enum F_Unit F_Unit;
+typedef enum EdgeType EdgeType;
+typedef struct Node Node;
+typedef struct NodeList NodeList;
+typedef struct Child Child;
+typedef struct GraphInfo GraphInfo;
+
+//function declarations
+inline static NodeList* new_list(void);
+inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
+inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
+inline static int add_new_parent(Node* node, Node* parent);
+inline static int add_node_to_list(Node* node, NodeList* list);
+inline static int add_use_dependency(Node* node, uint32_t VR, Node** VRtoDef);
+inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
+inline static int add_memory_dependency_list(Node* node, NodeList* head);
+inline static Node* find_last_memory_dependency(Node* node, NodeList* head);
+NodeList* build_dependency_graph(IR* head, uint32_t maxVR);
+void print_graph(NodeList* nodes);
 
 //which functional unit(s) the node can run in
-typedef enum {
+enum F_Unit{
     ZERO,
     ONE,
     BOTH
-} F_Unit;
+};
 
 //types of edges
-typedef enum {
+enum EdgeType {
     def,
     serial,
     conflict, 
-} EdgeType;
+};
 
 //information to be used for heuristic
 //found while traversing the graph
-typedef struct{
+struct GraphInfo{
 
-} GraphInfo;
+};
 
 //Node struct for dependency graph
-struct _Node{
+struct Node{
     //original instruction
     IR* op;
 
@@ -67,10 +83,9 @@ struct _Node{
     uint32_t num;
 };
 
-
 //linked list of nodes
 //adheres to List type
-struct _NodeList{
+struct NodeList{
     NodeList* next;
     NodeList* prev;
     Node* node;
@@ -78,11 +93,12 @@ struct _NodeList{
 
 //linked list of children
 //adheres to List type
-struct _Child{
+struct Child{
     Child* next;
     Child* prev;
     Node* node;
     EdgeType edge;
     uint32_t register_cause;
 };
+
 #endif

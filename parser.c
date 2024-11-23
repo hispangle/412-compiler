@@ -3,19 +3,7 @@
 #include "tokens.h"
 #include "ir.h"
 
-//change tok to global pointer in scanner
-//get_tok changes contents but not pointer
-//allows use of same pointer in parser
-
-//groups of linked lists
-//allocate heads, 
-//then full groups as needed
-
 //allocate space for IR at setup and in larger chunks after (exponential i think) (1k, 2k, 4k, 8k, etc)
-
-//externs
-extern token get_next_token();
-extern token get_next_eol_token();
 
 //keep track of line number and op num
 uint32_t line_num = 1;
@@ -60,7 +48,7 @@ void print_token_error(uint32_t name){
 
 
 //declare missing regs
-const char* MISSING[] = {"constant", "first source register", "comma", "second source register",  "=>", "target register"};
+const static char* MISSING[] = {"constant", "first source register", "comma", "second source register",  "=>", "target register"};
 
 //prints descriptive sentence erroring
 void print_sentence_error(uint8_t missing, uint32_t opcode){
