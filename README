@@ -5,28 +5,17 @@
 
 Build Instructions:
     make clean: Removes any intermediate files, as well as the created executable.
-    make build: Creates the executable 412alloc, along with any intermediate files.
-    make tar: Creates the tar file agm6.tar, which contains all files needed to build and submit lab2.
+    make build: Creates the executable schedule, along with any intermediate files.
+    make tar: Creates the tar file agm6.tar, which contains all files needed to build and submit lab3.
 
 
 
-Help for 412fe (412 Front End):
+Help for schedule (412 scheduler):
 Command syntax:
-./412alloc [optional flags] <filename>
+schedule <filename>
 
-        <filename>: The file where the ILOC program is stored. 412alloc will print an error if file cannot be accessed.
+        <filename>: The file where the ILOC program is stored. schedule will print an error if file cannot be accessed. Ignores any further arguments.
 
-Optional Flags:
-        Flags are displayed in order of priority. Only one flag will be processed.
+schedule -h
 
-        -h: Displays this help text. Ignores any file given.
-
-        -x: Parses the ILOC program given at filename, and displays the same program with virtual registers instead of given registers. 
-                Prints errors to stderr on failure.
-
-        -r: Parses the ILOC program given at filename, and displays the Intermediate Representation. 
-                Prints errors to stderr upon error discovery.
-
-        -p: Parses the ILOC program given at filename. Displays number of operations parsed on success. Prints errors to stderr on failure.
-
-        -s: Scans the ILOC program given at filename. Prints all tokens found.
+        -h: Displays this help text. Ignores any other arguments.

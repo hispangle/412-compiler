@@ -220,19 +220,12 @@ int scheduler(NodeList* graph){
 
     //main loop, iterates while ready set and active set exist
     while(n_ready + n_active_0 + n_active_1){
-        // printf("n_ready: %i\nn_active_0: %i\nn_active_1: %i\n\n", n_ready, n_active_0, n_active_1);
-        // print_graph(ready);
-        // printf("loop\n");
-        // fprintf(stderr, "loop: ");
         //select nodes to print
         select_nodes(selected, ready, n_ready, nop_node);
-        // printf("node selected: %p\n", selected[0]);
 
         //activate nodes
         if(selected[0] != nop_node){
-            // printf("node: %p\nrem cycles: %i\n\n", selected[0], selected[0]->remaining_cycles);
             if(add_node_to_list(selected[0], active_0)) return -1;
-            // printf("active next: %p\n", active_0->next);
             n_active_0++;
             n_ready--;
         }

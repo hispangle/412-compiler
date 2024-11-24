@@ -4,6 +4,9 @@
 #include "ir.h"
 #include "list.h"
 
+//define a max function
+#define MAX(a, b) a > b ? a : b;
+
 //typedef declarations
 typedef enum F_Unit F_Unit;
 typedef enum EdgeType EdgeType;
@@ -42,7 +45,8 @@ enum EdgeType {
 //information to be used for heuristic
 //found while traversing the graph
 struct GraphInfo{
-
+    uint32_t n_ready;
+    uint32_t max_weight;
 };
 
 //Node struct for dependency graph
