@@ -7,8 +7,8 @@
 //define a max function
 #define MAX(a, b) a > b ? a : b
 
-// //define the number of bytes accessible
-// #define MEM_MAX 32768
+//define the number of bytes accessible
+#define MEM_MAX 32768
 
 //typedef declarations
 typedef enum F_Unit F_Unit;

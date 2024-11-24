@@ -165,8 +165,8 @@ static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
 /*
 */
 static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeType edge){
-    // uint8_t address_accounted = calloc(MEM_MAX / 4, sizeof(uint8_t));
-    // if(address_accounted == NULL) return -1;
+    uint8_t* address_accounted = calloc(MEM_MAX / 4, sizeof(uint8_t));
+    if(address_accounted == NULL) return -1;
 
     //loop until an item with unknown address is found
     Node* item_node;
@@ -185,15 +185,19 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
             return 0;
         }
 
-
         //add memory dependency
-        // //if this address chain has not been included
-        // if(!address_accounted[*(item_node->mem_loc) / 4]){
+        //check if memory location is tracked
+        //if this address chain has not been included add to parents
+        if(*(item_node->mem_loc) >= MEM_MAX){
             if(add_new_parent(node, item_node)) return -1;
             if(add_new_child(node, item_node, edge, 0)) return -1;
             n_parents++;
-            // address_accounted[*(item_node->mem_loc) / 4] = 1;
-        // }
+        } else if(!address_accounted[*(item_node->mem_loc) / 4]){
+            if(add_new_parent(node, item_node)) return -1;
+            if(add_new_child(node, item_node, edge, 0)) return -1;
+            n_parents++;
+            address_accounted[*(item_node->mem_loc) / 4] = 1;
+        }
         
         item = item->prev;
     }

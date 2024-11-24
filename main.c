@@ -72,30 +72,20 @@ int schedule(char* filename){
     //rename
     if(rename_registers(head, *n_ops, maxVR, maxlive)) return -1;
 
-    //print IR
-    // print_IR_List(head, VR);
-
     //build dependency
     NodeList* graph = build_dependency_graph(head, *maxVR, *n_ops);
     if(graph == NULL) return -1;
 
-    clock_t end = clock();
-
-    //print dependency  
-    // print_graph(graph);
-
     //calculate heuristic
     if(calc_heuristics(graph)) return -1;
-
-    // print_graph(graph);
 
     //run scheduler
     if(scheduler(graph)) return -1;
 
-    // print_graph(graph);
-    return 0;
+    clock_t end = clock();
 
     // printf("length: %f\n", ((float) (end - start)) / CLOCKS_PER_SEC);
+    return 0;
 }
 
 
