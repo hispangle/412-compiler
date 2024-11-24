@@ -84,6 +84,11 @@ int schedule(char* filename){
     //print dependency  
     // print_graph(graph);
 
+    //calculate heuristic
+    if(calc_heuristics(graph)) return -1;
+
+    // print_graph(graph);
+
     //run scheduler
     if(scheduler(graph)) return -1;
 

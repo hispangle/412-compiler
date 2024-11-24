@@ -6,6 +6,70 @@
 
 /*
 */
+int calc_heuristics(NodeList* graph){
+    //weight: nready but for children
+    //load > store: if load +5?
+
+
+
+    NodeList* explore = new_list();
+    if(explore == NULL) return -1;
+
+    //add roots to explore
+    NodeList* item = graph->next;
+    while(item != graph){
+        //add if root
+        if(item->node->n_children == 0){
+            if(add_node_to_list(item->node, explore)) return -1;
+        }
+
+        item = item->next;
+    }
+
+    //go thru all nodes
+    Node* node;
+    NodeList* parent;
+    while(explore->next != explore){
+        NodeList* new_explore = new_list();
+        if(new_explore == NULL) return -1;
+
+        item = explore->next;
+        while(item != explore){
+            //set heuristic to be max_weight + latency (+ 5 if load)
+            node = item->node;
+            node->heuristic = node->latency + node->graph_info.max_weight + ((node->op == load) ? 5 : 0);
+
+            //change all parents
+            parent = node->parents->next;
+            for(uint32_t i = 0; i < node->n_parents; i++){
+                //change weight
+                uint32_t* weight = &(parent->node->graph_info.max_weight);
+                *weight = MAX(*weight, node->heuristic);
+
+                //change n_ready
+                parent->node->graph_info.n_ready++;
+
+                //add to explore if all children explored
+                if(parent->node->graph_info.n_ready == parent->node->n_children){
+                    if(add_node_to_list(parent->node, new_explore)) return -1;
+                }
+
+                parent = parent->next;
+            }
+
+
+            item = item->next;
+        }
+
+        NodeList* temp = explore;
+        explore = new_explore;
+        free(temp);
+    }
+    return 0;
+}
+
+/*
+*/
 int early_release(NodeList* ready, uint32_t* n_ready, Node* node){
     Child* child = node->children->next;
     for(uint32_t i = 0; i < node->n_children; i++){

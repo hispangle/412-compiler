@@ -5,7 +5,10 @@
 #include "list.h"
 
 //define a max function
-#define MAX(a, b) a > b ? a : b;
+#define MAX(a, b) a > b ? a : b
+
+// //define the number of bytes accessible
+// #define MEM_MAX 32768
 
 //typedef declarations
 typedef enum F_Unit F_Unit;
@@ -16,15 +19,15 @@ typedef struct Child Child;
 typedef struct GraphInfo GraphInfo;
 
 //function declarations
-inline static NodeList* new_list(void);
-inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
-inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
-inline static int add_new_parent(Node* node, Node* parent);
-inline static int add_node_to_list(Node* node, NodeList* list);
-inline static int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef);
-inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
-inline static int add_memory_dependency_list(Node* node, NodeList* head);
-inline static Node* find_last_memory_dependency(Node* node, NodeList* head);
+static inline NodeList* new_list(void);
+static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
+static inline int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
+static inline int add_new_parent(Node* node, Node* parent);
+static inline int add_node_to_list(Node* node, NodeList* list);
+static inline int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef);
+static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
+static inline int add_memory_dependency_list(Node* node, NodeList* head);
+static inline Node* find_last_memory_dependency(Node* node, NodeList* head);
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops);
 void print_graph(NodeList* nodes);
 
@@ -117,7 +120,7 @@ struct Child{
  * Returns:
  *      NodeList*: the dummy head of the created list.
 */
-inline static NodeList* new_list(){
+static inline NodeList* new_list(){
     NodeList* list = malloc(sizeof(NodeList));
     if(list == NULL) return NULL;
     list->next = list;
@@ -139,7 +142,7 @@ inline static NodeList* new_list(){
  *      0 on success
  *      -1 on failure
 */
-inline static int add_node_to_list(Node* node, NodeList* list){
+static inline int add_node_to_list(Node* node, NodeList* list){
     //create NodeList to house node
     NodeList* next_list = malloc(sizeof(NodeList));
     if(next_list == NULL) return -1;

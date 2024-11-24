@@ -21,7 +21,7 @@
  *      Node* node on success, the new node created.
  *      NULL on failure.
 */
-inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit){
+static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit){
     //malloc node
     Node* node = malloc(sizeof(Node));
     if(node == NULL) return NULL;
@@ -47,7 +47,7 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     node->latency = latency;
     node->remaining_cycles = latency;
     node->unit = unit;
-    node->heuristic = 1;
+    node->heuristic = UINT32_MAX - op_num;
 
     //zero fields
     node->mem_loc = NULL;
@@ -76,7 +76,7 @@ inline static Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
  *      0 on success.
  *      -1 on failure.
 */
-inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause){
+static inline int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause){
     //create Child
     Child* child = malloc(sizeof(Child));
     if(child == NULL) return -1;
@@ -97,7 +97,7 @@ inline static int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_
 
 /*
 */
-inline static int add_new_parent(Node* node, Node* parent){
+static inline int add_new_parent(Node* node, Node* parent){
     if(add_node_to_list(parent, node->parents)) return -1;
     node->n_parents++;
     return 0;
@@ -118,7 +118,7 @@ inline static int add_new_parent(Node* node, Node* parent){
  *      0 on success
  *      -1 on failure
 */
-inline static int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef){
+static inline int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef){
     //find and add parent
     Node* parent = VRtoDef[VR];
     // if(parent == NULL) return -1; //only possible on undefed use
@@ -150,7 +150,7 @@ inline static int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef){
  *      0 on success
  *      -1 on failure
 */
-inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edge){
+static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edge){
     Node* parent = find_last_memory_dependency(node, head);
 
     //make children if parent exists
@@ -160,6 +160,48 @@ inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
     } 
     return 0;
 }
+
+
+/*
+*/
+static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeType edge){
+    // uint8_t address_accounted = calloc(MEM_MAX / 4, sizeof(uint8_t));
+    // if(address_accounted == NULL) return -1;
+
+    //loop until an item with unknown address is found
+    Node* item_node;
+    uint32_t n_parents = 0;
+    NodeList* item = head->prev;
+    while(item != head){
+        item_node = item->node;
+
+        //if item is unknown, finish
+        if(item_node->mem_loc == NULL){
+            //if there were no previous nodes, add this as a parent
+            if(!n_parents){
+                if(add_new_parent(node, item_node)) return -1;
+                if(add_new_child(node, item_node, edge, 0)) return -1;
+            }
+            return 0;
+        }
+
+
+        //add memory dependency
+        // //if this address chain has not been included
+        // if(!address_accounted[*(item_node->mem_loc) / 4]){
+            if(add_new_parent(node, item_node)) return -1;
+            if(add_new_child(node, item_node, edge, 0)) return -1;
+            n_parents++;
+            // address_accounted[*(item_node->mem_loc) / 4] = 1;
+        // }
+        
+        item = item->prev;
+    }
+
+    //free(address_accounted);
+    return 0;
+}
+
 
 /*
  * Creates a memory dependency (edge) between the given node and all nodes in the list that access the 
@@ -175,7 +217,7 @@ inline static int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
  *      0 on success
  *      -1 on failure
 */
-inline static int add_memory_dependency_list(Node* node, NodeList* head){
+static inline int add_memory_dependency_list(Node* node, NodeList* head){
     //get def dependencies (always the first two)
     Node* def_parent_1 = node->parents->next->node;
     Node* def_parent_2 = node->parents->next->next->node;
@@ -227,7 +269,7 @@ inline static int add_memory_dependency_list(Node* node, NodeList* head){
  *          Is be NULL if no node satisfies 
  *          the conditions. 
 */
-inline static Node* find_last_memory_dependency(Node* node, NodeList* head){
+static inline Node* find_last_memory_dependency(Node* node, NodeList* head){
     //if memory address known, skip different addresses
     if(node->mem_loc != NULL){
         //loop backwards in list
@@ -326,7 +368,13 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
                 
                 //memory dependencies
                 //store->load (RAW) conflict
-                if(add_memory_dependency(node, store_list, conflict)) return NULL;
+                //check if this is unknown
+                if(node->mem_loc == NULL){
+                    if(add_memory_dependency_latest(node, store_list, conflict)) return NULL;
+                } else {
+                    if(add_memory_dependency(node, store_list, conflict)) return NULL;
+                }
+                
 
                 //add to load_list
                 if(add_node_to_list(node, load_list)) return NULL;
@@ -352,8 +400,13 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
 
                 //memory dependencies
                 //store->store (WAW) serialization
-                if(add_memory_dependency(node, store_list, serial)) return NULL;
-
+                //check if this is unknown
+                if(node->mem_loc == NULL){
+                    if(add_memory_dependency_latest(node, store_list, serial)) return NULL;
+                } else {
+                    if(add_memory_dependency(node, store_list, serial)) return NULL;
+                }
+                
                 //load->store (WAR) serializations
                 if(add_memory_dependency_list(node, load_list)) return NULL;
 
@@ -475,72 +528,6 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
 
 
 /*
-*/
-int calc_heuristics(NodeList* graph){
-    //weight: nready but for children
-    //load > store: if load +5?
-
-
-
-    NodeList* explore = new_list();
-    if(explore == NULL) return -1;
-
-    //add roots to explore
-    NodeList* item = graph->next;
-    while(item != graph){
-        //add if root
-        if(item->node->n_children == 0){
-            if(add_node_to_list(item->node, explore)) return -1;
-        }
-
-        item = item->next;
-    }
-
-
-    //go thru all nodes
-    Node* node;
-    NodeList* parent;
-    while(explore->next != explore){
-        NodeList* new_explore = new_list();
-        if(new_explore == NULL) return -1;
-
-        item = explore->next;
-        while(item != explore){
-            //set heuristic to be max_weight + latency (+ 5 if load)
-            node = item->node;
-            node->heuristic = node->graph_info.max_weight + node->op == load ? 5 : 0;
-
-            //change all parents
-            parent = node->parents->next;
-            for(uint32_t i = 0; i < node->n_parents; i++){
-                //change weight
-                uint32_t* weight = &(parent->node->graph_info.max_weight);
-                *weight = MAX(*weight, node->heuristic);
-
-                //change n_ready
-                parent->node->graph_info.n_ready++;
-
-                //add to explore if all children explored
-                if(parent->node->graph_info.n_ready == parent->node->n_children){
-                    if(add_node_to_list(parent->node, new_explore)) return -1;
-                }
-
-                parent = parent->next;
-            }
-
-
-            item = item->next;
-        }
-
-        NodeList* temp = explore;
-        explore = new_explore;
-        free(temp);
-    }
-
-}
-
-
-/*
  * Prints the dependency graph given by the nodes in dot format, readable by graphviz.
  * Does not modify the graph, or the nodes of the graph.
  * 
@@ -561,7 +548,8 @@ void print_graph(NodeList* nodes){
         Node* node = item->node;
         printf("\t%i [label=\"%i: ", node->num, node->num);
         print_IR(node->op, VR);
-        printf("; n_par = %i; n_ready = %i; n_child = %i\"];\n", node->n_parents, node->n_ready, node->n_children);
+        // printf("; n_par = %i; n_ready = %i; n_child = %i; heuristic: %i", node->n_parents, node->n_ready, node->n_children, node->heuristic);
+        printf("\"];\n");
         item = item->next;
     }
 
