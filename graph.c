@@ -388,12 +388,10 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
     NodeList* item = head->prev;
     while(item != head){
         item_node = item->node;
-        printf("loop!\n");
         //if item is unknown, finish
         if(item_node->mem_loc == NULL){
-            printf("check\n");
-            //if different type of unknown, continue
-            if(!same_location(node, item_node, max_VR)){
+            //if the two nodes are disjoint, no need to add dependence
+            if(are_disjoint(node, item_node, max_VR)){
                 item = item->prev;
                 continue;
             }
@@ -459,7 +457,7 @@ static inline int add_memory_dependency_list(Node* node, NodeList* head, uint32_
         } 
 
         //if memory is different, continue
-        if(!same_location(node, list_element->node, max_VR)){
+        if(are_disjoint(node, list_element->node, max_VR)){
             list_element = list_element->next;
             continue;
         }
@@ -477,51 +475,35 @@ static inline int add_memory_dependency_list(Node* node, NodeList* head, uint32_
     return 0;
 }
 
-
-
 /*
 */
-static inline bool same_location(Node* first, Node* second, uint32_t max_VR){
-    //first location is unknown
-    if(first->mem_loc == NULL){
-        //second location is known
-        if(second->mem_loc != NULL){
-            return true;
-        }
-        printf("null mem\n");
-        //if either are invalid, are the same (unknown)
+static inline bool are_disjoint(Node* first, Node* second, uint32_t max_VR){
+    //if memory locations are known, check if locations are the same
+    if(first->mem_loc != NULL && second->mem_loc != NULL){
+        return *first->mem_loc != *second->mem_loc;
+    }
+
+    //if both unknown, check offset
+    if(first->mem_loc == NULL && second->mem_loc == NULL){
+        //if either are invalid, are not disjoint
         if(first->free_vars->invalid || second->free_vars->invalid){
-            return true;
+            return false;
         }
 
-        //second location unknown
-        //if counts array different, might be different
+        //if counts array different are not disjoint
         if(memcmp(first->free_vars->counts, second->free_vars->counts, (max_VR + 1) * sizeof(int32_t))){
             return false;
         }
 
-        //if offsets different, might be different
-        if(first->free_vars->offset != second->free_vars->offset){
-            return false;
-        }
-
-        //must be the same
-        return true;
+        //if offsets are different, are disjoint
+        return first->free_vars->offset != second->free_vars->offset;
     }
 
-    //first must be known
-    if(second->mem_loc == NULL){
-        return true;
-    }
-
-    //check locations
-    if(*first->mem_loc != *second->mem_loc){
-        return false;
-    }
-
-    //must be the same
-    return true;
+    //if 1 known and 1 unknown, not disjoint
+    return false;
 }
+
+
 
 
 /*
@@ -548,7 +530,9 @@ static inline Node* find_last_memory_dependency(Node* node, NodeList* head, uint
         while(current != head){
             uint32_t* mem = current->node->mem_loc;
 
-            if(same_location(node, current->node, max_VR)){
+
+            //return the node that is not provably disjoint
+            if(!are_disjoint(node, current->node, max_VR)){
                 return current->node;
             }
 

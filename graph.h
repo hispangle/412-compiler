@@ -33,7 +33,7 @@ static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
 static inline int add_memory_dependency_unknowns(Node* node, NodeList* head, EdgeType edge);
 static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeType edge, uint32_t max_VR);
 static inline int add_memory_dependency_list(Node* node, NodeList* head, uint32_t max_VR);
-static inline bool same_location(Node* first, Node* second, uint32_t max_VR);
+static inline bool are_disjoint(Node* first, Node* second, uint32_t max_VR);
 static inline Node* find_last_memory_dependency(Node* node, NodeList* head, uint32_t max_VR);
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops);
 void print_graph(NodeList* nodes);
