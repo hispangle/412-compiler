@@ -7,11 +7,6 @@
 /*
 */
 int calc_heuristics(NodeList* graph){
-    //weight: nready but for children
-    //load > store: if load +5?
-
-
-
     NodeList* explore = new_list();
     if(explore == NULL) return -1;
 
@@ -25,33 +20,38 @@ int calc_heuristics(NodeList* graph){
 
         item = item->next;
     }
-// printf("roots made\n");
+
     //go thru all nodes
     Node* node;
     NodeList* parent;
     while(explore->next != explore){
-        // printf("loop!\n");
         NodeList* new_explore = new_list();
         if(new_explore == NULL) return -1;
 
         item = explore->next;
         while(item != explore){
-            //set heuristic to be max_weight + latency (+ 5 if load)
+            //set heuristic to be max_weight
             node = item->node;
-            node->heuristic = node->latency + node->graph_info.max_weight + ((node->op->opcode == load) ? 2 : 0);
+            node->heuristic = node->latency + node->graph_info.max_weight;
+            // printf("\nloop\n");
+            // printf("heuristic: %u\n", node->heuristic);
+            
 
             //change all parents
             parent = node->parents->next;
             for(uint32_t i = 0; i < node->n_parents; i++){
                 //change weight
+                // printf("weight: %u\n", parent->node->graph_info.max_weight);
                 uint32_t* weight = &(parent->node->graph_info.max_weight);
                 *weight = MAX(*weight, node->heuristic);
+                // printf("max: %u; heuristic: %u\n", *weight, node->heuristic);
 
                 //change n_ready
                 parent->node->graph_info.n_ready++;
 
                 //add to explore if all children explored
                 if(parent->node->graph_info.n_ready == parent->node->n_children){
+                    // if(parent->node->op->opcode == load) printf("added load\n");
                     if(add_node_to_list(parent->node, new_explore)) return -1;
                 }
 
@@ -65,6 +65,22 @@ int calc_heuristics(NodeList* graph){
         NodeList* temp = explore;
         explore = new_explore;
         free(temp);
+    }
+
+    //add 2 to heuristic to all loads
+    item = graph->next;
+    while(item != graph){
+        node = item->node;
+        if(node->op->opcode == load){
+            // printf("!!heuristic: %u\n", node->heuristic);
+            node->heuristic += 2;
+        }
+
+        if(node->heuristic == 0){
+                // printf("o no\n");
+            }
+
+        item = item->next;
     }
     return 0;
 }
@@ -173,9 +189,11 @@ void select_nodes(Node** selection, NodeList* ready, uint32_t n_ready, Node* nop
         //select based on possible units
         switch(node->unit){
             case ZERO:
+                // printf("heuristic: %i; first: %i\n\n", node->heuristic, first_heuristic);
                 if(current_heuristic > first_heuristic){
                     first_heuristic = current_heuristic;
                     first = node_list;
+                    // printf("selected\n");
                 }
                 break;
             
@@ -188,7 +206,7 @@ void select_nodes(Node** selection, NodeList* ready, uint32_t n_ready, Node* nop
 
             case BOTH:
                 //compare with the min heuristic
-                if(first_heuristic > second_heuristic){
+                if(first_heuristic >= second_heuristic){
                     if(current_heuristic > second_heuristic){
                         second_heuristic = current_heuristic;
                         second = node_list;
@@ -285,6 +303,8 @@ int scheduler(NodeList* graph){
 
     //main loop, iterates while ready set and active set exist
     while(n_ready + n_active_0 + n_active_1){
+        // printf("loop\nn_ready: %i; n_active_0: %i; n_active_1: %i\n", n_ready, n_active_0, n_active_1);
+        // print_graph(ready);
         //select nodes to print
         select_nodes(selected, ready, n_ready, nop_node);
 

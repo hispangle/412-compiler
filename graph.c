@@ -197,7 +197,7 @@ static inline int evaluate(uint32_t** VRtoConst, FreeVars* VRtoFreeVars, uint32_
 */
 static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit, uint32_t max_VR){
     //malloc node
-    Node* node = malloc(sizeof(Node));
+    Node* node = calloc(1, sizeof(Node));
     if(node == NULL) return NULL;
     
     //malloc child
@@ -221,15 +221,17 @@ static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     node->latency = latency;
     node->remaining_cycles = latency;
     node->unit = unit;
-    node->heuristic = UINT32_MAX - op_num;
+    node->heuristic = 0;
 
-    //zero fields
-    node->mem_loc = NULL;
-    node->n_children = 0;
-    node->n_parents = 0;
-    node->n_ready = 0;
-    node->releasable = false;
-    node->free_vars = NULL;
+    // //zero fields
+    // node->mem_loc = NULL;
+    // node->n_children = 0;
+    // node->n_parents = 0;
+    // node->n_ready = 0;
+    // node->releasable = false;
+    // node->free_vars = NULL;
+    // node->graph_info.max_weight = 0;
+    // node->graph_info.n_ready = 0;
     
     //do free vars
     // int32_t* counts = calloc(max_VR + 1, sizeof(int32_t));
@@ -793,7 +795,7 @@ void print_graph(NodeList* nodes){
         Node* node = item->node;
         printf("\t%i [label=\"%i: ", node->num, node->num);
         print_IR(node->op, VR);
-        // printf("; n_par = %i; n_ready = %i; n_child = %i; heuristic: %i", node->n_parents, node->n_ready, node->n_children, node->heuristic);
+        printf("; n_par = %i; n_ready = %i; n_child = %i; heuristic: %i", node->n_parents, node->n_ready, node->n_children, node->heuristic);
         printf("\"];\n");
         item = item->next;
     }
