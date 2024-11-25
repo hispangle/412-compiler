@@ -4,6 +4,181 @@
 #include "ir.h"
 #include "graph.h"
 #include "list.h"
+#include "string.h"
+
+
+/*
+*/
+static inline bool check_zero(FreeVars free_vars, int32_t* zero_array, uint32_t max_VR){
+    if(free_vars.offset){
+        return false;
+    }
+    if(memcmp(free_vars.counts, zero_array, max_VR + 1)){
+        return false;
+    }
+    return true;
+}
+
+
+/*
+*/
+static inline int evaluate(uint32_t** VRtoConst, FreeVars* VRtoFreeVars, uint32_t* zero_array, 
+                            uint8_t opcode, uint32_t VR_1, uint32_t VR_2, uint32_t VR_3, uint32_t max_VR){
+    uint32_t* const_1 = VRtoConst[VR_1];
+    uint32_t* const_2 = VRtoConst[VR_2];
+    if(const_1 != NULL && const_2 != NULL){
+        uint32_t* val = malloc(sizeof(uint32_t));
+        if(val == NULL) return -1;
+
+        //evaluate constant
+        switch(opcode){
+            case add:
+                *val = *const_1 + *const_2;
+                break;
+            case sub:
+                *val = *const_1 - *const_2;
+                break;
+            case mult:
+                *val = *const_1 * *const_2;
+                break;
+            case lshift:
+                *val = *const_1 << *const_2;
+                break;
+            case rshift:
+                *val = *const_1 >> *const_2;
+                break;
+        }
+
+        VRtoConst[VR_3] = val;
+        return 0;
+    }
+
+    //evaluate free vars
+    FreeVars free_vars_1 = VRtoFreeVars[VR_1];
+    FreeVars free_vars_2 = VRtoFreeVars[VR_2];
+
+    //if either are invalid, this too must be invalid
+    if(free_vars_1.invalid || free_vars_2.invalid){
+        VRtoFreeVars[VR_3].invalid = true;
+        return 0;
+    }
+
+    
+    //create counts
+    int32_t* counts = calloc(max_VR + 1, sizeof(int32_t));
+    if(counts == NULL) return -1;
+    VRtoFreeVars[VR_3].counts = counts;
+
+    //if neither are constants, combine the two free_vars
+    if(const_1 == NULL && const_2 == NULL){
+        switch(opcode){
+            case add:
+                for(uint32_t i = 0; i < max_VR + 1; i++){
+                    counts[i] = free_vars_1.counts[i] + free_vars_2.counts[i];
+                }
+                VRtoFreeVars[VR_3].offset = free_vars_1.offset + free_vars_2.offset;
+                break;
+            case sub:
+                for(uint32_t i = 0; i < max_VR + 1; i++){
+                    counts[i] = free_vars_1.counts[i] - free_vars_2.counts[i];
+                }
+                VRtoFreeVars[VR_3].offset = free_vars_1.offset - free_vars_2.offset;
+                break;
+            //only cases with at least 1 constant can be evaluated
+            case mult:
+                VRtoFreeVars[VR_3].invalid = true;
+                break;
+            //only cases with at least 1 constant can be evaluated
+            case lshift:
+                VRtoFreeVars[VR_3].invalid = true;
+                break;
+            //only cases with at least 1 constant can be evaluated
+            case rshift:
+                VRtoFreeVars[VR_3].invalid = true;
+                break;
+            default:
+                break;
+
+        }
+
+        //check if this evaluated to 0
+        if(check_zero(VRtoFreeVars[VR_3], zero_array, max_VR)){
+            uint32_t* zero = calloc(1, sizeof(uint32_t));
+            if(zero == NULL) return -1;
+            VRtoConst[VR_3] = zero;
+        }
+
+        return 0;
+    }
+
+    //one of the consts must exist
+    //force constant to be second
+    if(const_1 != NULL){
+        free_vars_1 = free_vars_2;
+        const_2 = const_1;
+    }
+
+    //freevar (op) const case
+    switch(opcode){
+        case add:
+            VRtoFreeVars[VR_3] = free_vars_1;
+            VRtoFreeVars[VR_3].offset += *const_2;
+            break;
+        case sub:
+            //check if const was first or second slot
+            //constant second slot
+            if(const_1 == NULL){
+                VRtoFreeVars[VR_3] = free_vars_1;
+                VRtoFreeVars[VR_3].offset -= *const_2;
+                break;
+            }
+
+            //constant first slot
+            for(uint32_t i = 0; i < max_VR + 1; i++){
+                counts[i] = -free_vars_1.counts[i];
+            }
+            VRtoFreeVars[VR_3].offset = *const_2 - free_vars_1.offset;
+            break;
+        case mult:
+            for(uint32_t i = 0; i < max_VR + 1; i++){
+                counts[i] = free_vars_1.counts[i] * *const_2;
+            }
+            VRtoFreeVars[VR_3].offset *= *const_2;
+            break;
+        case lshift:
+        case rshift:
+            //if constant is not 0, cannot do special cases
+            if(!*const_2){
+                VRtoFreeVars[VR_3].invalid = true;
+                break;
+            }
+
+            //check which special case to do
+            //0 second slot
+            if(const_1 == NULL){
+                VRtoFreeVars[VR_3] = free_vars_1;
+                break;
+            }   
+
+            //0 second slot
+            uint32_t* zero = calloc(1, sizeof(uint32_t));
+            if(zero == NULL) return -1;
+            VRtoConst[VR_3] = zero;
+            return 0;
+            break;
+        default:
+            break;
+
+        //check if this evaluated to 0
+        if(check_zero(VRtoFreeVars[VR_3], zero_array, max_VR)){
+            uint32_t* zero = calloc(1, sizeof(uint32_t));
+            if(zero == NULL) return -1;
+            VRtoConst[VR_3] = zero;
+        }
+    }
+
+    return 0;
+}
 
 
 /*
@@ -21,7 +196,7 @@
  *      Node* node on success, the new node created.
  *      NULL on failure.
 */
-static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit){
+static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit, uint32_t max_VR){
     //malloc node
     Node* node = malloc(sizeof(Node));
     if(node == NULL) return NULL;
@@ -55,6 +230,14 @@ static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit un
     node->n_parents = 0;
     node->n_ready = 0;
     node->releasable = false;
+    node->free_vars = NULL;
+    
+    //do free vars
+    // int32_t* counts = calloc(max_VR + 1, sizeof(int32_t));
+    // if(counts == NULL) return NULL;
+    // node->free_vars.counts = counts;
+    // node->free_vars.invalid = false;
+    // node->free_vars.offset = 0;
 
     //return initialized node
     return node;
@@ -150,8 +333,8 @@ static inline int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef){
  *      0 on success
  *      -1 on failure
 */
-static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edge){
-    Node* parent = find_last_memory_dependency(node, head);
+static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edge, uint32_t max_VR){
+    Node* parent = find_last_memory_dependency(node, head, max_VR);
 
     //make children if parent exists
     if(parent != NULL){
@@ -163,8 +346,40 @@ static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edg
 
 
 /*
+ * Assumes node has a memory location
 */
-static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeType edge){
+static inline int add_memory_dependency_unknowns(Node* node, NodeList* head, EdgeType edge){
+    uint32_t mem_loc = *(node->mem_loc);
+    uint8_t added = 0;
+    Node* item_node;
+    NodeList* item = head->next;
+    while(item != head){
+        item_node = item->node;
+        //add unknowns until the same address is found
+        if(item_node->mem_loc == NULL){
+            if(add_new_parent(node, item_node)) return -1;
+            if(add_new_child(node, item_node, edge, 0)) return -1;
+            added = 1;
+        } else if(mem_loc == *(item_node->mem_loc)){
+            //add the node with the same address if there were no unknowns
+            if(!added){
+                if(add_new_parent(node, item_node)) return -1;
+                if(add_new_child(node, item_node, edge, 0)) return -1;
+            }
+            return 0;
+        }
+
+
+        item = item->next;
+    }
+    return 0;
+}
+
+
+/*
+ * Assumes node has no memory location
+*/
+static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeType edge, uint32_t max_VR){
     uint8_t* address_accounted = calloc(MEM_MAX / 4, sizeof(uint8_t));
     if(address_accounted == NULL) return -1;
 
@@ -177,6 +392,12 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
 
         //if item is unknown, finish
         if(item_node->mem_loc == NULL){
+            //if different type of unknown, continue
+            if(!same_location(node, item_node, max_VR)){
+                item = item->prev;
+                continue;
+            }
+
             //if there were no previous nodes, add this as a parent
             if(!n_parents){
                 if(add_new_parent(node, item_node)) return -1;
@@ -221,7 +442,7 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
  *      0 on success
  *      -1 on failure
 */
-static inline int add_memory_dependency_list(Node* node, NodeList* head){
+static inline int add_memory_dependency_list(Node* node, NodeList* head, uint32_t max_VR){
     //get def dependencies (always the first two)
     Node* def_parent_1 = node->parents->next->node;
     Node* def_parent_2 = node->parents->next->next->node;
@@ -236,12 +457,9 @@ static inline int add_memory_dependency_list(Node* node, NodeList* head){
         } 
 
         //if memory is different, continue
-        uint32_t* mem = list_element->node->mem_loc;
-        if(mem != NULL && node->mem_loc != NULL){
-            if(*mem != *(node->mem_loc)){
-                list_element = list_element->next;
-                continue;
-            }
+        if(!same_location(node, list_element->node, max_VR)){
+            list_element = list_element->next;
+            continue;
         }
 
         //make child //assumes serial edge
@@ -256,6 +474,48 @@ static inline int add_memory_dependency_list(Node* node, NodeList* head){
 
     return 0;
 }
+
+
+
+/*
+*/
+static inline bool same_location(Node* first, Node* second, uint32_t max_VR){
+    //first location is unknown
+    if(first->mem_loc == NULL){
+        //second location is known
+        if(second->mem_loc != NULL){
+            return true;
+        }
+
+        //second location unknown
+        //if counts array different, might be different
+        if(memcmp(first->free_vars->counts, second->free_vars->counts, max_VR + 1)){
+            return false;
+        }
+
+        //if offsets different, might be different
+        if(first->free_vars->offset != second->free_vars->offset){
+            return false;
+        }
+
+        //must be the same
+        return true;
+    }
+
+    //first must be known
+    if(second->mem_loc == NULL){
+        return true;
+    }
+
+    //check locations
+    if(*first->mem_loc != *second->mem_loc){
+        return false;
+    }
+
+    //must be the same
+    return true;
+}
+
 
 /*
  * Find the last node in the list given that has the same memory address as node or 
@@ -273,7 +533,7 @@ static inline int add_memory_dependency_list(Node* node, NodeList* head){
  *          Is be NULL if no node satisfies 
  *          the conditions. 
 */
-static inline Node* find_last_memory_dependency(Node* node, NodeList* head){
+static inline Node* find_last_memory_dependency(Node* node, NodeList* head, uint32_t max_VR){
     //if memory address known, skip different addresses
     if(node->mem_loc != NULL){
         //loop backwards in list
@@ -281,8 +541,7 @@ static inline Node* find_last_memory_dependency(Node* node, NodeList* head){
         while(current != head){
             uint32_t* mem = current->node->mem_loc;
 
-            //unknown or same address
-            if(mem == NULL || *mem == *(node->mem_loc)){
+            if(same_location(node, current->node, max_VR)){
                 return current->node;
             }
 
@@ -314,7 +573,7 @@ static inline Node* find_last_memory_dependency(Node* node, NodeList* head){
  *          dependency graph on success.
  *      NULL on failure.
 */
-NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
+NodeList* build_dependency_graph(IR* head, uint32_t max_VR, uint32_t n_ops){
     //create the nodes list
     NodeList* node_list = new_list();
     if(node_list == NULL) return NULL;
@@ -332,17 +591,26 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
     if(store_list == NULL) return NULL;
 
     //create a VR to DEF map
-    Node** VRtoDef = calloc((maxVR + 1), sizeof(Node*));
+    Node** VRtoDef = calloc((max_VR + 1), sizeof(Node*));
     if(VRtoDef == NULL) return NULL;
 
     //create a VR to Const map
-    uint32_t** VRtoConst = calloc((maxVR + 1), sizeof(uint32_t*));
+    uint32_t** VRtoConst = calloc((max_VR + 1), sizeof(uint32_t*));
     if(VRtoConst == NULL) return NULL;
+
+    //create a VR to FreeVars map
+    FreeVars* VRtoFreeVars = calloc((max_VR + 1), sizeof(FreeVars));
+    if(VRtoFreeVars == NULL) return NULL;
+
+    //create a zero array
+    int32_t* zero = calloc(max_VR + 1, sizeof(int32_t));
+    if(zero == NULL) return NULL;
 
     //loop thru operations first to last
     Node* node;
     IR* op = head->next;
     for(uint32_t op_num = 0; op_num < n_ops; op_num++){
+        // printf("op num: %i\n", op_num);
         //skip nops
         if(op->opcode == nop){
             op = op->next;
@@ -357,7 +625,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
         switch(op->opcode){
             case load:
                 //create new node
-                node = new_node(op, op_num, 6, ZERO); 
+                node = new_node(op, op_num, 6, ZERO, max_VR); 
                 if(node == NULL) return NULL;
 
                 //use dependency
@@ -365,18 +633,25 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
 
                 //add memory location
                 node->mem_loc = VRtoConst[VR_1];
+                node->free_vars = &(VRtoFreeVars[VR_1]);
 
                 //definition
                 //assign to VRtoDef
                 VRtoDef[VR_3] = node;
+
+                //create a free var for VR_3 if memory contents unknown (currently always)
+                int32_t* counts = calloc(max_VR + 1, sizeof(int32_t));
+                if(counts == NULL) return NULL;
+                counts[VR_3] = 1;
+                VRtoFreeVars[VR_3].counts = counts;
                 
                 //memory dependencies
                 //store->load (RAW) conflict
                 //check if this is unknown
                 if(node->mem_loc == NULL){
-                    if(add_memory_dependency_latest(node, store_list, conflict)) return NULL;
+                    if(add_memory_dependency_latest(node, store_list, conflict, max_VR)) return NULL;
                 } else {
-                    if(add_memory_dependency(node, store_list, conflict)) return NULL;
+                    if(add_memory_dependency_unknowns(node, store_list, conflict)) return NULL;
                 }
                 
 
@@ -389,7 +664,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
                 break;
             case store:
                 //create new node
-                node = new_node(op, op_num, 6, ZERO);
+                node = new_node(op, op_num, 6, ZERO, max_VR);
                 if(node == NULL) return NULL;
 
                 //use dependencies
@@ -401,32 +676,33 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
 
                 //add memory location
                 node->mem_loc = VRtoConst[VR_3];
+                node->free_vars = &(VRtoFreeVars[VR_3]);
 
                 //memory dependencies
                 //store->store (WAW) serialization
                 //check if this is unknown
                 if(node->mem_loc == NULL){
-                    if(add_memory_dependency_latest(node, store_list, serial)) return NULL;
+                    if(add_memory_dependency_latest(node, store_list, serial, max_VR)) return NULL;
                 } else {
-                    if(add_memory_dependency(node, store_list, serial)) return NULL;
+                    if(add_memory_dependency_unknowns(node, store_list, serial)) return NULL;
                 }
-                
+
                 //load->store (WAR) serializations
-                if(add_memory_dependency_list(node, load_list)) return NULL;
+                if(add_memory_dependency_list(node, load_list, max_VR)) return NULL;
 
                 //output->store (WAR) serialization
-                if(add_memory_dependency(node, output_list, serial)) return NULL;
+                if(add_memory_dependency(node, output_list, serial, max_VR)) return NULL;
 
                 //add to store_list
                 if(add_node_to_list(node, store_list)) return NULL;
-                
+
                 //can release children early
                 node->releasable = true;
 
                 break;
             case loadI:
                 //create new node
-                node = new_node(op, op_num, 1, BOTH);
+                node = new_node(op, op_num, 1, BOTH, max_VR);
                 if(node == NULL) return NULL;
 
                 //definition
@@ -442,7 +718,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
             case lshift:
             case rshift:
                 //create new node //latency (3 for mult, 1 for everything else) //mult can only be processed on unit one
-                node = new_node(op, op_num, op->opcode == mult ? 3 : 1, op->opcode == mult ? ONE : BOTH);
+                node = new_node(op, op_num, op->opcode == mult ? 3 : 1, op->opcode == mult ? ONE : BOTH, max_VR);
                 if(node == NULL) return NULL;
 
                 //use dependencies
@@ -452,34 +728,8 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
                 //use 2
                 if(add_data_dependency(node, VR_2, VRtoDef)) return NULL;
 
-                //if both uses are constants, propagate constant
-                uint32_t* const_1 = VRtoConst[VR_1];
-                uint32_t* const_2 = VRtoConst[VR_2];
-                if(const_1 != NULL && const_2 != NULL){
-                    uint32_t* val = malloc(sizeof(uint32_t));
-                    if(val == NULL) return NULL;
-
-                    //evaluate constant
-                    switch(op->opcode){
-                        case add:
-                            *val = *const_1 + *const_2;
-                            break;
-                        case sub:
-                            *val = *const_1 - *const_2;
-                            break;
-                        case mult:
-                            *val = *const_1 * *const_2;
-                            break;
-                        case lshift:
-                            *val = *const_1 << *const_2;
-                            break;
-                        case rshift:
-                            *val = *const_1 >> *const_2;
-                            break;
-                    }
-
-                    VRtoConst[VR_3] = val;
-                }
+                //evaluate constants and free vars
+                if(evaluate(VRtoConst, VRtoFreeVars, zero, op->opcode, VR_1, VR_2, VR_3, max_VR)) return NULL;
 
                 //definition
                 //assign to VRtoDef
@@ -490,22 +740,22 @@ NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops){
                 break;
             case output:
                 //create new node
-                node = new_node(op, op_num, 1, BOTH); 
+                node = new_node(op, op_num, 1, BOTH, max_VR); 
                 if(node == NULL) return NULL;
 
                 //memory dependencies
                 //output->output (deterministic) serialization
-                if(add_memory_dependency(node, output_list, serial)) return NULL;
+                if(add_memory_dependency(node, output_list, serial, max_VR)) return NULL;
 
                 //memory location
                 node->mem_loc = &(op->arg1.VR);
 
                 //store->output (RAW) conflict
-                if(add_memory_dependency(node, store_list, conflict)) return NULL;
+                if(add_memory_dependency(node, store_list, conflict, max_VR)) return NULL;
 
                 //add to output_list
                 add_node_to_list(node, output_list);
-                
+
                 //can release children early
                 node->releasable = true;
         

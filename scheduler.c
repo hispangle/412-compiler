@@ -25,11 +25,12 @@ int calc_heuristics(NodeList* graph){
 
         item = item->next;
     }
-
+// printf("roots made\n");
     //go thru all nodes
     Node* node;
     NodeList* parent;
     while(explore->next != explore){
+        // printf("loop!\n");
         NodeList* new_explore = new_list();
         if(new_explore == NULL) return -1;
 

@@ -76,7 +76,7 @@ int schedule(char* filename){
     NodeList* graph = build_dependency_graph(head, *maxVR, *n_ops);
     if(graph == NULL) return -1;
 
-    // print_graph(graph);
+    print_graph(graph);
 
     //calculate heuristic
     if(calc_heuristics(graph)) return -1;

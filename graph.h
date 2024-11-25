@@ -13,21 +13,28 @@
 //typedef declarations
 typedef enum F_Unit F_Unit;
 typedef enum EdgeType EdgeType;
+typedef struct FreeVars FreeVars;
 typedef struct Node Node;
 typedef struct NodeList NodeList;
 typedef struct Child Child;
 typedef struct GraphInfo GraphInfo;
 
 //function declarations
+static inline bool check_zero(FreeVars free_vars, int32_t* zero_array, uint32_t max_VR);
+static inline int evaluate(uint32_t** VRtoConst, FreeVars* VRtoFreeVars, uint32_t* zero_array, 
+                            uint8_t opcode, uint32_t VR_1, uint32_t VR_2, uint32_t VR_3, uint32_t max_VR);
 static inline NodeList* new_list(void);
-static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit);
+static inline Node* new_node(IR* op, uint32_t op_num, uint8_t latency, F_Unit unit, uint32_t max_VR);
 static inline int add_new_child(Node* node, Node* parent, EdgeType edge, uint32_t register_cause);
 static inline int add_new_parent(Node* node, Node* parent);
 static inline int add_node_to_list(Node* node, NodeList* list);
 static inline int add_data_dependency(Node* node, uint32_t VR, Node** VRtoDef);
-static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edge);
-static inline int add_memory_dependency_list(Node* node, NodeList* head);
-static inline Node* find_last_memory_dependency(Node* node, NodeList* head);
+static inline int add_memory_dependency(Node* node, NodeList* head, EdgeType edge, uint32_t max_VR);
+static inline int add_memory_dependency_unknowns(Node* node, NodeList* head, EdgeType edge);
+static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeType edge, uint32_t max_VR);
+static inline int add_memory_dependency_list(Node* node, NodeList* head, uint32_t max_VR);
+static inline bool same_location(Node* first, Node* second, uint32_t max_VR);
+static inline Node* find_last_memory_dependency(Node* node, NodeList* head, uint32_t max_VR);
 NodeList* build_dependency_graph(IR* head, uint32_t maxVR, uint32_t n_ops);
 void print_graph(NodeList* nodes);
 
@@ -43,6 +50,13 @@ enum EdgeType {
     def,
     serial,
     conflict, 
+};
+
+//info for free variables
+struct FreeVars{
+    bool invalid;
+    uint32_t* counts;
+    uint32_t offset;
 };
 
 //information to be used for heuristic
@@ -78,11 +92,8 @@ struct Node{
     // memory location used in a memop
     uint32_t* mem_loc;
 
-    //VR sources + offset if mem loc is unknown and relative offset is calculatable
-    uint32_t source_VR_1;
-    uint32_t source_VR_2;
-    uint32_t offset;
-
+    //free var info
+    FreeVars* free_vars;
 
     //parents list, and number of parents ready
     uint32_t n_ready;
