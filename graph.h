@@ -78,6 +78,12 @@ struct Node{
     // memory location used in a memop
     uint32_t* mem_loc;
 
+    //VR sources + offset if mem loc is unknown and relative offset is calculatable
+    uint32_t source_VR_1;
+    uint32_t source_VR_2;
+    uint32_t offset;
+
+
     //parents list, and number of parents ready
     uint32_t n_ready;
     uint32_t n_parents;

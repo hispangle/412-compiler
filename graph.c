@@ -202,7 +202,7 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
         item = item->prev;
     }
 
-    //free(address_accounted);
+    free(address_accounted);
     return 0;
 }
 
