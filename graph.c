@@ -13,7 +13,7 @@ static inline bool check_zero(FreeVars free_vars, int32_t* zero_array, uint32_t 
     if(free_vars.offset){
         return false;
     }
-    if(memcmp(free_vars.counts, zero_array, max_VR + 1)){
+    if(memcmp(free_vars.counts, zero_array, (max_VR + 1) * sizeof(uint32_t))){
         return false;
     }
     return true;
@@ -63,7 +63,6 @@ static inline int evaluate(uint32_t** VRtoConst, FreeVars* VRtoFreeVars, uint32_
         return 0;
     }
 
-    
     //create counts
     int32_t* counts = calloc(max_VR + 1, sizeof(int32_t));
     if(counts == NULL) return -1;
@@ -352,7 +351,7 @@ static inline int add_memory_dependency_unknowns(Node* node, NodeList* head, Edg
     uint32_t mem_loc = *(node->mem_loc);
     uint8_t added = 0;
     Node* item_node;
-    NodeList* item = head->next;
+    NodeList* item = head->prev;
     while(item != head){
         item_node = item->node;
         //add unknowns until the same address is found
@@ -370,7 +369,7 @@ static inline int add_memory_dependency_unknowns(Node* node, NodeList* head, Edg
         }
 
 
-        item = item->next;
+        item = item->prev;
     }
     return 0;
 }
@@ -389,15 +388,16 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
     NodeList* item = head->prev;
     while(item != head){
         item_node = item->node;
-
+        printf("loop!\n");
         //if item is unknown, finish
         if(item_node->mem_loc == NULL){
+            printf("check\n");
             //if different type of unknown, continue
             if(!same_location(node, item_node, max_VR)){
                 item = item->prev;
                 continue;
             }
-
+            
             //if there were no previous nodes, add this as a parent
             if(!n_parents){
                 if(add_new_parent(node, item_node)) return -1;
@@ -422,6 +422,8 @@ static inline int add_memory_dependency_latest(Node* node, NodeList* head, EdgeT
         
         item = item->prev;
     }
+
+    //need to add unknown
 
     free(address_accounted);
     return 0;
@@ -486,10 +488,15 @@ static inline bool same_location(Node* first, Node* second, uint32_t max_VR){
         if(second->mem_loc != NULL){
             return true;
         }
+        printf("null mem\n");
+        //if either are invalid, are the same (unknown)
+        if(first->free_vars->invalid || second->free_vars->invalid){
+            return true;
+        }
 
         //second location unknown
         //if counts array different, might be different
-        if(memcmp(first->free_vars->counts, second->free_vars->counts, max_VR + 1)){
+        if(memcmp(first->free_vars->counts, second->free_vars->counts, (max_VR + 1) * sizeof(int32_t))){
             return false;
         }
 
@@ -642,7 +649,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t max_VR, uint32_t n_ops){
                 //create a free var for VR_3 if memory contents unknown (currently always)
                 int32_t* counts = calloc(max_VR + 1, sizeof(int32_t));
                 if(counts == NULL) return NULL;
-                counts[VR_3] = 1;
+                counts[VR_1] = 1;
                 VRtoFreeVars[VR_3].counts = counts;
                 
                 //memory dependencies
@@ -666,7 +673,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t max_VR, uint32_t n_ops){
                 //create new node
                 node = new_node(op, op_num, 6, ZERO, max_VR);
                 if(node == NULL) return NULL;
-
+                
                 //use dependencies
                 //use 1
                 if(add_data_dependency(node, VR_1, VRtoDef)) return NULL;
@@ -686,13 +693,13 @@ NodeList* build_dependency_graph(IR* head, uint32_t max_VR, uint32_t n_ops){
                 } else {
                     if(add_memory_dependency_unknowns(node, store_list, serial)) return NULL;
                 }
-
+                
                 //load->store (WAR) serializations
                 if(add_memory_dependency_list(node, load_list, max_VR)) return NULL;
 
                 //output->store (WAR) serialization
                 if(add_memory_dependency(node, output_list, serial, max_VR)) return NULL;
-
+                
                 //add to store_list
                 if(add_node_to_list(node, store_list)) return NULL;
 
@@ -751,7 +758,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t max_VR, uint32_t n_ops){
                 node->mem_loc = &(op->arg1.VR);
 
                 //store->output (RAW) conflict
-                if(add_memory_dependency(node, store_list, conflict, max_VR)) return NULL;
+                if(add_memory_dependency_unknowns(node, store_list, conflict)) return NULL;
 
                 //add to output_list
                 add_node_to_list(node, output_list);
@@ -763,7 +770,7 @@ NodeList* build_dependency_graph(IR* head, uint32_t max_VR, uint32_t n_ops){
             default:
                 break;
         }
-
+        // printf("op num: %i; node: %p\n\n", op_num, node);
         //add to node list
         if(add_node_to_list(node, node_list)) return NULL;
 

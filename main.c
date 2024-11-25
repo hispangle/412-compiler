@@ -72,6 +72,8 @@ int schedule(char* filename){
     //rename
     if(rename_registers(head, *n_ops, maxVR, maxlive)) return -1;
 
+    print_IR_List(head, VR);
+
     //build dependency
     NodeList* graph = build_dependency_graph(head, *maxVR, *n_ops);
     if(graph == NULL) return -1;

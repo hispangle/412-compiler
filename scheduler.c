@@ -38,7 +38,7 @@ int calc_heuristics(NodeList* graph){
         while(item != explore){
             //set heuristic to be max_weight + latency (+ 5 if load)
             node = item->node;
-            node->heuristic = node->latency + node->graph_info.max_weight + ((node->op == load) ? 5 : 0);
+            node->heuristic = node->latency + node->graph_info.max_weight + ((node->op->opcode == load) ? 2 : 0);
 
             //change all parents
             parent = node->parents->next;
