@@ -180,6 +180,7 @@ void select_nodes(Node** selection, NodeList* ready, uint32_t n_ready, Node* nop
     uint32_t current_heuristic = 0;
 
     //look at each node in ready set
+    //change to process exlusive then any
     Node* node;
     NodeList* node_list = ready->next;
     for(uint32_t i = 0; i < n_ready; i++){
@@ -203,8 +204,19 @@ void select_nodes(Node** selection, NodeList* ready, uint32_t n_ready, Node* nop
                     second = node_list;
                 }
                 break;
+        }
 
-            case BOTH:
+        node_list = node_list->next;
+    }
+
+    //process both after exclusive processed
+    node_list = ready->next;
+    for(uint32_t i = 0; i < n_ready; i++){
+        node = node_list->node;
+        current_heuristic = node->heuristic;
+
+        //process both
+        if(node->unit == BOTH){
                 //compare with the min heuristic
                 if(first_heuristic >= second_heuristic){
                     if(current_heuristic > second_heuristic){
@@ -218,7 +230,6 @@ void select_nodes(Node** selection, NodeList* ready, uint32_t n_ready, Node* nop
                     }
                 }
         }
-
         node_list = node_list->next;
     }
 
